@@ -1,0 +1,443 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* --- TOKENS DE COR (SISTEMA BASE) --- */
+    
+    /* Backgrounds & Superfícies */
+    --background: 210 40% 98%;      /* Fundo principal (Slate 50) */
+    --foreground: 222 47% 11%;      /* Texto principal (Slate 950) */
+    
+    --card: 0 0% 100%;              /* Fundo de cards/modais (Branco) */
+    --card-foreground: 222 47% 11%; /* Texto em cards */
+    
+    --surface-muted: 210 40% 96.1%; /* Superfícies sutis (Slate 100) */
+    --surface-accent: 210 40% 94%;   /* Destaques sutis */
+
+    /* Identidade (Premium Green) */
+    --primary: 142 93% 8%;          /* Verde Concrem Escuro */
+    --primary-hover: 142 93% 15%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 215 20% 65%;       /* Cinza médio */
+    --secondary-foreground: 222 47% 11%;
+
+    /* Tipografia & Estados */
+    --muted: 215 16% 47%;           /* Texto secundário/desativado */
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 142 93% 90%;          /* Fundo de badge/seleção sutil */
+    --accent-foreground: 142 93% 10%;
+
+    /* Bordas & Inputs */
+    --border: 214 32% 91%;          /* Bordas padrão (Slate 200) */
+    --input: 214 32% 91%;
+    --ring: 142 93% 15%;
+
+    /* Estados de Feedback */
+    --success: 161 94% 30%;         /* Verde sucesso */
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;          /* Laranja alerta */
+    --warning-foreground: 48 96% 10%;
+    --destructive: 0 84% 60%;       /* Vermelho erro */
+    --destructive-foreground: 210 40% 98%;
+
+    --radius: 1rem;
+  }
+
+  /* Sidebar Branding - FIXO E IDÊNTICO PARA AMBOS OS TEMAS */
+  :root, .dark, [data-theme="dark"], [data-theme="light"] {
+    --sidebar-background: 142 93% 8%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 142 93% 15%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 142 93% 12%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 142 93% 12%;
+    --sidebar-ring: 142 93% 20%;
+  }
+
+  .dark, [data-theme="dark"] {
+    /* --- TOKENS DE COR (MODO ESCURO) --- */
+    
+    /* Backgrounds & Superfícies */
+    --background: 222 47% 2%;       /* Fundo principal (Quase preto) */
+    --foreground: 210 40% 98%;      /* Texto principal (Slate 50) */
+
+    --card: 222 47% 4%;             /* Cards no dark mode */
+    --card-foreground: 210 40% 98%;
+    
+    --surface-muted: 222 47% 8%;    /* Inputs/Seções no dark */
+    --surface-accent: 222 47% 12%;
+
+    /* Identidade (Ajustada para Dark) */
+    --primary: 161 94% 30%;         /* Verde Concrem Vibrante no Dark */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 217 19% 27%;
+    --secondary-foreground: 210 40% 98%;
+
+    /* Tipografia & Estados */
+    --muted: 215 20% 65%;           /* Texto secundário no dark */
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 161 94% 10%;          /* Destaque sutil no dark */
+    --accent-foreground: 161 94% 90%;
+
+    /* Bordas & Inputs */
+    --border: 217 19% 15%;
+    --input: 217 19% 15%;
+    --ring: 161 94% 30%;
+
+    /* Estados de Feedback (Geralmente mantidos ou levemente ajustados) */
+    --success: 161 94% 30%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 48 96% 10%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+  }
+}
+
+@layer base {
+  /* Dark Mode (iOS) */
+  [data-theme="dark"] {
+    --bg-primary: #000000;
+    --bg-secondary: #1c1c1e;
+    --bg-tertiary: #2c2c2e;
+    --text-primary: #ffffff;
+    --text-secondary: #ebebf5;
+    --text-tertiary: rgba(235, 235, 245, 0.6);
+    --separator-opaque: #38383a;
+    --separator-non-opaque: rgba(84, 84, 88, 0.6);
+    --fill-primary: rgba(120, 120, 128, 0.36);
+    --fill-secondary: rgba(120, 120, 128, 0.32);
+    --fill-tertiary: rgba(118, 118, 128, 0.24);
+    --system-blue: #0a84ff;
+    --system-green: #30d158;
+    --system-red: #ff453a;
+    --system-orange: #ff9f0a;
+    --system-yellow: #ffd60a;
+    --system-purple: #bf5af2;
+    --system-pink: #ff375f;
+    --system-teal: #64d2ff;
+    --gray: #8e8e93;
+    --gray-2: #636366;
+    --gray-3: #48484a;
+    --gray-4: #3a3a3c;
+    --gray-5: #2c2c2e;
+    --gray-6: #1c1c1e;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
+    /* Bridge to Tailwind CSS HSL system */
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 100%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 75%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 208 100% 54%; /* approx of #0a84ff */
+    --success: 142 76% 35%;
+    --warning: 40 100% 50%;
+    --destructive: 0 85% 60%;
+    --accent: 0 0% 18%;
+    --accent-foreground: 0 0% 100%;
+  }
+
+  /* Force tables/cards to adopt dark palette */
+  [data-theme="dark"] .stat-card,
+  [data-theme="dark"] .rounded-lg.border.bg-card {
+    background-color: hsl(var(--card)) !important;
+    color: var(--text-primary) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+  [data-theme="dark"] table,
+  [data-theme="dark"] thead,
+  [data-theme="dark"] tbody,
+  [data-theme="dark"] tr,
+  [data-theme="dark"] th,
+  [data-theme="dark"] td {
+    background-color: hsl(var(--card)) !important;
+    color: var(--text-primary) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+}
+
+@layer components {
+  /* Layout Containers */
+  .app-container {
+    @apply min-h-screen bg-background text-foreground transition-colors duration-300;
+  }
+  
+  .main-content {
+    @apply flex-1 p-4 md:p-8 space-y-8 max-w-7xl mx-auto w-full;
+  }
+
+  /* Cards & Surfaces */
+  .premium-card {
+    @apply bg-card border border-border rounded-xl shadow-sm hover:shadow-md transition-all duration-300;
+  }
+
+  /* Typography */
+  .title-primary {
+    @apply text-2xl md:text-3xl font-bold tracking-tight text-foreground;
+  }
+
+  .text-secondary {
+    @apply text-sm md:text-base text-muted-foreground leading-relaxed;
+  }
+
+  /* Buttons Standard */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary-hover px-4 py-2 rounded-lg font-semibold transition-all active:scale-95 disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    background-color: hsl(var(--surface-muted));
+    color: hsl(var(--foreground));
+    border: 1px solid hsl(var(--border));
+    @apply px-4 py-2 rounded-lg font-medium transition-all active:scale-95;
+  }
+  .btn-secondary:hover {
+    background-color: hsl(var(--surface-accent));
+  }
+
+  /* Form Elements */
+  .input-standard {
+    background-color: hsl(var(--surface-muted));
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--foreground));
+    @apply w-full rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none placeholder:text-muted-foreground/50;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    font-family: 'Inter', 'Manrope', system-ui, -apple-system, sans-serif;
+  }
+
+  html {
+    @apply bg-background;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  input, textarea, select, button {
+    font: inherit;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold;
+  }
+}
+
+@layer utilities {
+  ::selection {
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+  .stat-card {
+    @apply premium-card p-6;
+  }
+
+  .scrollbar-hidden {
+    scrollbar-width: none;
+  }
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+
+  .transition-standard {
+    @apply transition-all duration-200 ease-in-out;
+  }
+
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .internal-page {
+    @apply min-w-0 space-y-6 sm:space-y-7;
+  }
+
+  .internal-page > :first-child {
+    scroll-margin-top: 1rem;
+  }
+
+  .internal-page table {
+    @apply w-full text-sm;
+  }
+
+  .internal-page thead {
+    @apply bg-slate-50/90;
+  }
+
+  .internal-page th {
+    @apply h-11 whitespace-nowrap px-4 text-left text-[11px] font-bold uppercase tracking-[0.1em] text-slate-500;
+  }
+
+  .internal-page td {
+    @apply border-t border-slate-100 px-4 py-3.5 align-middle;
+  }
+
+  .internal-page tbody tr {
+    @apply transition-colors hover:bg-emerald-50/30;
+  }
+
+  .internal-page input,
+  .internal-page textarea,
+  .internal-page [role="combobox"] {
+    @apply border-slate-200 bg-white shadow-sm transition-[border-color,box-shadow] focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10;
+  }
+
+  .internal-page [role="dialog"] {
+    @apply rounded-2xl;
+  }
+
+  .premium-card {
+    @apply border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.04)];
+  }
+
+  @media (max-width: 640px) {
+    .internal-page button:not([role="switch"]),
+    .internal-page a[role="button"] {
+      max-width: 100%;
+    }
+
+    .internal-page [role="dialog"] {
+      max-width: calc(100vw - 1rem);
+    }
+
+    .internal-page .overflow-x-auto,
+    .internal-page [data-radix-scroll-area-viewport] {
+      overscroll-behavior-x: contain;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      scroll-behavior: auto !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  .progress-bar {
+    @apply h-2 bg-muted rounded-md overflow-hidden;
+  }
+
+  .progress-fill {
+    @apply h-full rounded-md bg-primary transition-all duration-300 ease-in-out;
+  }
+}
+  
+  .page-header {
+    @apply text-3xl font-bold text-foreground mb-6;
+  }
+  
+  .section-title {
+    @apply text-xl font-semibold text-foreground mb-4;
+  }
+
+  /* Touch-friendly classes for mobile */
+  .touch-button {
+    @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
+  }
+
+  .touch-input {
+    @apply min-h-[48px] text-base;
+  }
+
+  .touch-select {
+    @apply min-h-[48px] text-base;
+  }
+
+  .touch-textarea {
+    @apply min-h-[96px] text-base;
+  }
+
+  /* Mobile modal styles */
+  .mobile-modal {
+    @apply w-[95vw] max-w-[95vw] mx-2 my-4;
+  }
+
+  /* Responsive card grid */
+  .responsive-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4;
+  }
+
+  /* Mobile card styles */
+  .mobile-card {
+    @apply block md:hidden;
+  }
+
+  .desktop-table {
+    @apply hidden md:table;
+  }
+
+/* Print styles for A4 PDF of the Responsibility Term */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+
+  html, body {
+    background: var(--bg-primary) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hide everything except the term */
+  body * {
+    visibility: hidden;
+  }
+  #termo-responsabilidade, #termo-responsabilidade * {
+    visibility: visible;
+  }
+
+  /* Make sure the term lays out cleanly on one A4 page */
+  #termo-responsabilidade {
+    position: static !important;
+    width: 100%;
+    max-width: 180mm;
+    margin: 0 auto;
+    background: var(--bg-primary) !important;
+    border-color: hsl(var(--primary)) !important;
+    font-size: 11pt;
+    line-height: 1.4;
+    page-break-inside: avoid;
+  }
+
+  /* Ensure the logo is visible at the header */
+  #termo-responsabilidade img {
+    display: block;
+    max-height: 25mm;
+    object-fit: contain;
+  }
+
+  /* Remove dialog overlay in print */
+  .dialog-overlay {
+    display: none !important;
+  }
+}

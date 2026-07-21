@@ -1,0 +1,19 @@
+import { useCallback,useEffect,useState } from 'react'
+import QRCode from 'qrcode'
+import { Printer,RefreshCw,ShieldX,QrCode } from 'lucide-react'
+import { Dialog,DialogContent,DialogDescription,DialogFooter,DialogHeader,DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { supabase } from '@/lib/supabase'
+import type { EquipmentQrLabel } from '@/lib/equipment-qr-labels'
+type EquipmentIdentity={id:string;nome:string;patrimonio:string}
+export function EquipmentQrManageDialog({equipment,onOpenChange}:{equipment:EquipmentIdentity|null;onOpenChange:(open:boolean)=>void}){
+ const [label,setLabel]=useState<EquipmentQrLabel|null>(null),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[qr,setQr]=useState('')
+ const load=useCallback(async()=>{if(!equipment)return;const {data,error}=await supabase.functions.invoke('equipment-qr-admin',{body:{action:'equipment-label',equipmentId:equipment.id}});if(error){setLabel(null);setMessage('Este equipamento ainda não possui etiqueta ativa.')}else{setLabel(data as EquipmentQrLabel);setMessage('Etiqueta ativa localizada.')}},[equipment])
+ useEffect(()=>{setLabel(null);setQr('');setMessage('Consultando etiqueta…');void load()},[load])
+ const issue=async()=>{if(!equipment||busy)return;setBusy(true);try{const {data,error}=await supabase.functions.invoke('equipment-qr-admin',{body:{action:'issue-equipment-label',equipmentId:equipment.id}});if(error||!data?.publicUrl)throw error;setLabel(data as EquipmentQrLabel);setQr(await QRCode.toDataURL(data.publicUrl,{margin:0,width:512,errorCorrectionLevel:'M'}));setMessage('Etiqueta emitida com segurança.')}catch{setMessage('Não foi possível emitir a etiqueta. Verifique se já existe uma etiqueta ativa.')}finally{setBusy(false)}}
+ const mutate=async(action:'revoke'|'reissue')=>{if(!label||busy)return;if(!confirm(action==='revoke'?'Ao revogar, o QR deixará de funcionar. Continuar?':'O token atual será invalidado e substituído. Continuar?'))return;setBusy(true);try{const {data,error}=await supabase.functions.invoke('equipment-qr-admin',{body:{action,labelId:label.id}});if(error)throw error;if(action==='reissue'&&data?.publicUrl){setQr(await QRCode.toDataURL(data.publicUrl,{margin:0,width:512,errorCorrectionLevel:'M'}));setMessage('Token substituído. Imprima a nova etiqueta.')}else{setLabel(null);setQr('');setMessage('Etiqueta revogada.')}}catch{setMessage('Não foi possível concluir a operação.')}finally{setBusy(false)}}
+ return <Dialog open={Boolean(equipment)} onOpenChange={onOpenChange}><DialogContent className="max-w-md rounded-2xl"><DialogHeader><DialogTitle>Etiqueta QR do equipamento</DialogTitle><DialogDescription>{equipment?.nome} · {equipment?.patrimonio}</DialogDescription></DialogHeader>
+  {qr&&<img src={qr} alt={`QR ${equipment?.patrimonio}`} className="mx-auto h-52 w-52 border bg-white p-2"/>}{label&&<div className="rounded-xl border bg-slate-50 p-4"><p className="font-mono text-lg font-bold">{label.displayCode}</p><p className="text-xs text-slate-500">Status: {label.status}</p></div>}<p role="status" className="rounded-xl bg-slate-50 p-3 text-sm">{message}</p>
+  <div className="grid gap-2">{!label&&<Button disabled={busy} onClick={issue}><QrCode className="h-4 w-4"/>Gerar QR Code</Button>}<Button variant="outline" disabled={!qr} onClick={()=>window.print()}><Printer className="h-4 w-4"/>Imprimir etiqueta</Button><Button variant="outline" disabled={!label||busy} onClick={()=>mutate('reissue')}><RefreshCw className="h-4 w-4"/>Gerar novo token</Button><Button variant="destructive" disabled={!label||busy} onClick={()=>mutate('revoke')}><ShieldX className="h-4 w-4"/>Revogar etiqueta</Button></div><DialogFooter><Button variant="outline" onClick={()=>onOpenChange(false)}>Fechar</Button></DialogFooter>
+ </DialogContent></Dialog>
+}

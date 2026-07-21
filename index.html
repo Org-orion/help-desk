@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Help Desk - Concrem</title>
+    <meta name="description" content="Help Desk da Concrem Portas Premium — gestão de chamados, equipamentos e suporte. Produtos com madeira de reflorestamento, robustez e alta qualidade." />
+    <meta name="author" content="Concrem Portas Premium" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+
+    <meta property="og:title" content="Help Desk - Concrem Portas Premium" />
+    <meta property="og:description" content="Gestão de suporte da Concrem Portas. Produtos com madeira de reflorestamento, robustez e MDF Superflora." />
+    <meta property="og:type" content="website" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Help Desk - Concrem Portas Premium" />
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      (function() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        var el = document.getElementById('theme-icon');
+        if (el) { el.textContent = savedTheme === 'dark' ? '☀️' : '🌙'; }
+      })();
+      function toggleTheme() {
+        var html = document.documentElement;
+        var currentTheme = html.getAttribute('data-theme');
+        var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        updateThemeIcon(newTheme);
+      }
+      function updateThemeIcon(theme) {
+        var icon = document.getElementById('theme-icon');
+        if (icon) { icon.textContent = theme === 'dark' ? '☀️' : '🌙'; }
+      }
+    </script>
+  </body>
+</html>
