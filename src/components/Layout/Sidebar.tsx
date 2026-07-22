@@ -16,9 +16,9 @@ import {
   Tag,
   LogOut,
   User,
-  Menu,
+  X,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { LOGO_MINI_SRC } from '@/config/branding'
@@ -58,12 +58,44 @@ const cadastrosItems = [
 ]
 
 const Sidebar = () => {
-  const { isCollapsed, toggle } = useSidebar()
+  const { isCollapsed, toggle, closeMobile } = useSidebar()
   const { isMobile } = useResponsiveContext()
   const { pathname } = useLocation()
   const { logout, user } = useAuth()
   const navigate = useNavigate()
   const [cadastrosOpen, setCadastrosOpen] = useState(false)
+  const asideRef = useRef<HTMLElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (isMobile && !isCollapsed) {
+      window.requestAnimationFrame(() => closeButtonRef.current?.focus())
+    }
+  }, [isMobile, isCollapsed])
+
+  const handleDrawerKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (!isMobile || isCollapsed) return
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      closeMobile()
+      return
+    }
+    if (event.key !== 'Tab') return
+
+    const focusable = Array.from(asideRef.current?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ) ?? []).filter((element) => element.offsetParent !== null)
+    if (!focusable.length) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/'
@@ -76,43 +108,52 @@ const Sidebar = () => {
   const activeIconClass = 'text-emerald-50'
 
   return (
-    <aside className={cn(
-      'h-screen basis-[248px] bg-[#012611] text-white transition-[width,basis,transform] duration-300 ease-in-out flex flex-col z-50 border-r border-emerald-950/40 shadow-2xl shrink-0',
-      isMobile ? 'fixed inset-y-0 left-0' : 'relative',
-      isCollapsed ? 'w-[76px] basis-[76px]' : 'w-[244px] basis-[244px]',
+    <aside
+      ref={asideRef}
+      id={isMobile ? 'mobile-navigation-drawer' : undefined}
+      aria-label="Menu principal"
+      onKeyDown={handleDrawerKeyDown}
+      className={cn(
+      'basis-[248px] bg-[#012611] text-white transition-[width,basis,transform] duration-300 ease-in-out flex flex-col z-50 border-r border-emerald-950/40 shadow-2xl shrink-0',
+      isMobile ? 'fixed inset-y-0 left-0 h-[100dvh] w-[280px] max-w-[85vw] basis-auto overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]' : 'relative h-screen',
+      !isMobile && (isCollapsed ? 'w-[76px] basis-[76px]' : 'w-[244px] basis-[244px]'),
       isMobile && isCollapsed && '-translate-x-full'
     )}>
-      {/* Mobile Toggle Button */}
-      {isMobile && isCollapsed && (
-        <button 
-          onClick={toggle}
-          className="fixed top-4 left-4 z-[60] p-2 bg-[#075924] text-white rounded-lg shadow-lg lg:hidden"
-        >
-          <Menu className="h-6 w-6" />
-        </button>
-      )}
 
       {/* Header */}
       <button
         type="button"
-        onClick={toggle}
-        aria-label={isCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
-        title={isCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
+        onClick={isMobile ? undefined : toggle}
+        aria-label={isMobile ? 'CONCREM Help Desk' : isCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
+        title={isMobile ? undefined : isCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
         className={cn(
           'flex w-full cursor-pointer items-center border-0 border-b border-emerald-900/40 bg-transparent bg-gradient-to-b from-emerald-400/5 to-transparent px-4 py-4 text-left outline-none transition-colors hover:bg-white/[0.03] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-300/70',
-          isCollapsed ? 'justify-center' : 'gap-3'
+          isMobile ? 'gap-3' : isCollapsed ? 'justify-center' : 'gap-3'
         )}
       >
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-400/10 ring-1 ring-inset ring-emerald-300/10">
           <img src={LOGO_MINI_SRC} alt="CONCREM" className="h-5 w-auto object-contain" />
         </span>
-        {!isCollapsed && (
+        {(!isCollapsed || isMobile) && (
           <span className="min-w-0">
             <span className="block text-sm font-semibold leading-none tracking-tight text-white">CONCREM</span>
             <span className="mt-1 block text-[11px] font-medium leading-none text-emerald-100/55">Help Desk</span>
           </span>
         )}
       </button>
+      {isMobile && (
+        <Button
+          ref={closeButtonRef}
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={closeMobile}
+          aria-label="Fechar menu"
+          className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] h-10 w-10 rounded-xl text-emerald-50/70 hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-emerald-300"
+        >
+          <X className="h-5 w-5" aria-hidden="true" />
+        </Button>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-3 custom-scrollbar scrollbar-hidden" key={isCollapsed ? 'collapsed' : 'expanded'}>
@@ -128,7 +169,7 @@ const Sidebar = () => {
                 <div key={item.href}>
                   <Tooltip delayDuration={0} disableHoverableContent>
                     <TooltipTrigger asChild>
-                      <Link to={item.href}>
+                      <Link to={item.href} onClick={isMobile ? closeMobile : undefined}>
                         <Button 
                           variant="ghost" 
                           className={cn(
@@ -201,7 +242,7 @@ const Sidebar = () => {
             {!isCollapsed && cadastrosOpen && (
               <div className="ml-7 mt-1 space-y-0.5 border-l border-emerald-100/10 animate-in fade-in slide-in-from-top-1 duration-300">
                 {cadastrosItems.map((item) => (
-                  <Link to={item.href} key={item.href}>
+                  <Link to={item.href} key={item.href} onClick={isMobile ? closeMobile : undefined}>
                     <Button 
                       variant="ghost" 
                       className={cn(
@@ -250,7 +291,7 @@ const Sidebar = () => {
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  onClick={() => { logout(); navigate('/') }}
+                  onClick={() => { if (isMobile) closeMobile(); logout(); navigate('/') }}
                   className={cn('h-8 text-rose-300/62 hover:text-rose-200 hover:bg-rose-500/10 w-full justify-start px-3 text-[11px] border-none shadow-none', isCollapsed && 'justify-center px-0')}
                 >
                   <LogOut className="h-3.5 w-3.5" />

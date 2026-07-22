@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,7 @@ import { EquipmentQrScannerDialog } from '@/components/equipment-qr/EquipmentQrS
 import { EquipmentQrBindExistingDialog } from '@/components/equipment-qr/EquipmentQrBindExistingDialog';
 import { EquipmentQrManageDialog } from '@/components/equipment-qr/EquipmentQrManageDialog';
 import { EQUIPMENT_QR_LABELS_UNAVAILABLE_MESSAGE, type EquipmentQrLookupDTO } from '@/lib/equipment-qr-labels';
+import { ConfirmDeleteModal } from '@/components/shared/ConfirmDeleteModal';
 
 type Equipment = EquipamentoType;
 
@@ -149,6 +150,8 @@ const Equipamentos = () => {
   const [linkQrLabel, setLinkQrLabel] = useState<EquipmentQrLookupDTO | null>(null);
   const [manageQrEquipment, setManageQrEquipment] = useState<Equipment | null>(null);
   const [qrSubmitting, setQrSubmitting] = useState(false);
+  const [equipmentToDelete, setEquipmentToDelete] = useState<Equipment | null>(null);
+  const deleteMenuTriggerRef = useRef<HTMLElement>(null);
 
   const [newUser, setNewUser] = useState({ nome: '', username: '', setor: '', password: '', tipo: 'padrao' as 'padrao' | 'vip' | 'admin' });
 
@@ -655,7 +658,10 @@ const Equipamentos = () => {
                 equipment={eq} 
                 onView={() => { setSelectedEquipment(eq); setViewOpen(true); }}
                 onEdit={() => handleEdit(eq)}
-                onDelete={() => { if(confirm('Excluir ativo?')) deleteMut.mutate(eq.id); }}
+                onDelete={(trigger: HTMLElement | null) => {
+                  deleteMenuTriggerRef.current = trigger;
+                  setEquipmentToDelete(eq);
+                }}
                 onPrint={() => { setSelectedEquipment(eq); setTermDialogOpen(true); }}
                 onQrCode={() => handleGenerateQrCode(eq)}
               />
@@ -663,6 +669,19 @@ const Equipamentos = () => {
           </div>
         )}
       </div>
+
+      <ConfirmDeleteModal
+        open={Boolean(equipmentToDelete)}
+        asset={equipmentToDelete}
+        returnFocusRef={deleteMenuTriggerRef}
+        onOpenChange={(open) => {
+          if (!open) setEquipmentToDelete(null);
+        }}
+        onConfirm={async () => {
+          if (!equipmentToDelete) return;
+          await deleteMut.mutateAsync(equipmentToDelete.id);
+        }}
+      />
 
       {/* ── Asset (Create/Edit) — Side Sheet ───────────────────────────────── */}
       <Sheet open={assetSheetOpen} onOpenChange={handleAssetSheetOpenChange}>
@@ -1085,6 +1104,7 @@ const FilterChip = ({ active, label, icon: Icon, onClick }: any) => (
 const EquipmentItem = ({ equipment, onView, onEdit, onDelete, onPrint, onQrCode }: any) => {
   const status = getStatusConfig(equipment.status);
   const TypeIcon = getTypeIcon(equipment.tipo);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
 
   return (
     <div className="group flex flex-col lg:flex-row lg:items-center justify-between p-8 hover:bg-slate-50/80 transition-all cursor-pointer border-l-4 border-transparent hover:border-primary">
@@ -1135,7 +1155,7 @@ const EquipmentItem = ({ equipment, onView, onEdit, onDelete, onPrint, onQrCode 
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-slate-200 transition-colors">
+              <Button ref={menuTriggerRef} variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-slate-200 transition-colors">
                 <MoreHorizontal className="w-5 h-5 text-slate-400" />
               </Button>
             </DropdownMenuTrigger>
@@ -1153,7 +1173,7 @@ const EquipmentItem = ({ equipment, onView, onEdit, onDelete, onPrint, onQrCode 
                 <span className="font-bold text-slate-700">Gerar QR Code</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-2" />
-              <DropdownMenuItem onClick={onDelete} className="rounded-xl py-3 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50">
+              <DropdownMenuItem onSelect={() => onDelete(menuTriggerRef.current)} className="rounded-xl py-3 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50">
                 <Trash2 className="w-4 h-4 mr-3" />
                 <span className="font-bold">Excluir Ativo</span>
               </DropdownMenuItem>
