@@ -4,33 +4,16 @@ export const PUBLIC_EQUIPMENT_QR_UNAVAILABLE_MESSAGE =
 export const PUBLIC_EQUIPMENT_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43,128}$/
 
 export type PublicEquipmentDTO = {
-  nome: string
-  patrimonio: string
-  tipo: string
-  marca: string | null
-  modelo: string | null
-  statusOperacional: string
-  setor: string | null
-  ram: string | null
-  armazenamento: string | null
-  cpu: string | null
-  imagemPrincipalUrl: string | null
-  atualizadoEm: string | null
-}
-
-export type PublicEquipmentSource = {
-  nome: string
-  patrimonio: string
-  tipo: string
-  marca?: string | null
-  modelo?: string | null
+  name: string
+  assetCode: string
+  type: string
+  brand: string | null
+  model: string | null
   status: string
-  setor?: string | null
-  ram?: string | null
-  armazenamento?: string | null
-  processador?: string | null
-  imagem_principal_url?: string | null
-  updated_at?: string | null
+  sector: string | null
+  ram: string | null
+  storage: string | null
+  cpu: string | null
 }
 
 export type PublicEquipmentLookupResult =
@@ -42,42 +25,41 @@ export type PublicEquipmentLookupResult =
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
 
-const textOrNull = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null
-const textOrFallback = (value: unknown) => textOrNull(value) ?? 'Não informado'
-const safeImageUrl = (value: unknown) => {
-  const url = textOrNull(value)
-  if (!url) return null
-  try { return new URL(url).protocol === 'https:' ? url : null } catch { return null }
+const requiredText = (value: unknown) => typeof value === 'string' ? value : null
+const optionalText = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null
+
+const normalizeEquipment = (value: Record<string, unknown>): PublicEquipmentDTO | null => {
+  const name = requiredText(value.name)
+  const assetCode = requiredText(value.assetCode)
+  const type = requiredText(value.type)
+  const status = requiredText(value.status)
+  if (name === null || assetCode === null || type === null || status === null) return null
+
+  return {
+    name: name.trim() || 'Não informado',
+    assetCode: assetCode.trim() || 'Não informado',
+    type: type.trim() || 'Não informado',
+    brand: optionalText(value.brand),
+    model: optionalText(value.model),
+    status: status.trim() || 'Não informado',
+    sector: optionalText(value.sector),
+    ram: optionalText(value.ram),
+    storage: optionalText(value.storage),
+    cpu: optionalText(value.cpu),
+  }
 }
 
-const looksLikeEquipment = (value: Record<string, unknown>) =>
-  typeof value.nome === 'string' &&
-  typeof value.patrimonio === 'string' &&
-  typeof value.tipo === 'string' &&
-  typeof value.statusOperacional === 'string'
-
-const normalizeEquipment = (value: Record<string, unknown>): PublicEquipmentDTO => ({
-  nome: textOrFallback(value.nome),
-  patrimonio: textOrFallback(value.patrimonio ?? value.codigo),
-  tipo: textOrFallback(value.tipo),
-  marca: textOrNull(value.marca),
-  modelo: textOrNull(value.modelo),
-  statusOperacional: textOrFallback(value.statusOperacional ?? value.status),
-  setor: textOrNull(value.setor),
-  ram: textOrNull(value.ram),
-  armazenamento: textOrNull(value.armazenamento),
-  cpu: textOrNull(value.cpu ?? value.processador),
-  imagemPrincipalUrl: safeImageUrl(value.imagemPrincipalUrl ?? value.imagem_principal_url),
-  atualizadoEm: textOrNull(value.atualizadoEm ?? value.updated_at),
-})
-
-/** Accepts only the two response shapes returned by public-equipment. */
+/** Consome exclusivamente o contrato publicado pela Edge Function public-equipment. */
 export function normalizePublicEquipmentResponse(payload: unknown): PublicEquipmentLookupResult {
   const body = asRecord(payload)
-  if (!body) return { kind: 'unavailable' }
-  if (body.unlinked === true) return { kind: 'unlinked' }
-  if (looksLikeEquipment(body)) return { kind: 'ready', equipment: normalizeEquipment(body) }
-  return { kind: 'unavailable' }
+  if (!body || body.code !== 'ok') return { kind: 'not-found' }
+  if (body.state === 'UNBOUND' && body.equipment === null) return { kind: 'unlinked' }
+  if (body.state !== 'BOUND') return { kind: 'not-found' }
+
+  const equipment = asRecord(body.equipment)
+  if (!equipment) return { kind: 'not-found' }
+  const normalized = normalizeEquipment(equipment)
+  return normalized ? { kind: 'ready', equipment: normalized } : { kind: 'not-found' }
 }
 
 export async function requestPublicEquipment(
@@ -107,24 +89,8 @@ export async function requestPublicEquipment(
 }
 
 export function resolvePublicEquipmentInvocation(payload: unknown, errorStatus?: number): PublicEquipmentLookupResult {
-  if (errorStatus !== undefined) return { kind: errorStatus === 404 ? 'not-found' : 'unavailable' }
-  return normalizePublicEquipmentResponse(payload)
-}
-
-/** Converts a server-selected record into the only shape allowed in public responses. */
-export function toPublicEquipmentDTO(source: PublicEquipmentSource): PublicEquipmentDTO {
-  return {
-    nome: source.nome,
-    patrimonio: source.patrimonio,
-    tipo: source.tipo,
-    marca: source.marca ?? null,
-    modelo: source.modelo ?? null,
-    statusOperacional: source.status,
-    setor: source.setor ?? null,
-    ram: source.ram ?? null,
-    armazenamento: source.armazenamento ?? null,
-    cpu: source.processador ?? null,
-    imagemPrincipalUrl: source.imagem_principal_url ?? null,
-    atualizadoEm: source.updated_at ?? null,
+  if (errorStatus !== undefined) {
+    return errorStatus === 500 || errorStatus === 503 ? { kind: 'unavailable' } : { kind: 'not-found' }
   }
+  return normalizePublicEquipmentResponse(payload)
 }
