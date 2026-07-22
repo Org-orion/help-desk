@@ -26,9 +26,19 @@ import { ResponsiveLayout } from "@/components/ResponsiveLayout";
 
 const queryClient = new QueryClient();
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+const LoginRoute = () => {
   const { isAuthenticated, user } = useAuth();
+  if (isAuthenticated) {
+    const destination = user?.role === 'admin' || user?.tier === 'vip' ? '/dashboard' : '/chamados';
+    return <Navigate to={destination} replace />;
+  }
+  return <Login />;
+};
+
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, user, loading } = useAuth();
   const { pathname } = useLocation();
+  if (loading) return null;
   if (!isAuthenticated) return <Navigate to="/" />
   const isAdmin = user?.role === 'admin'
   const isVip = user?.tier === 'vip' && !isAdmin
@@ -46,7 +56,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const router = createBrowserRouter([
-  { path: "/", element: <Login /> },
+  { path: "/", element: <LoginRoute /> },
   { path: "/consulta/equipamento", element: <PublicEquipment /> },
   { path: "/consulta/equipamento/:token", element: <PublicEquipment /> },
   { path: "/dashboard", element: <ProtectedRoute><Dashboard /></ProtectedRoute> },

@@ -8,4 +8,12 @@ const isValidSupabaseUrl = (u: string | undefined) =>
   !!u && /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(u)
 
 export const supabase: SupabaseClient | undefined =
-  enabled && isValidSupabaseUrl(url) && !!anonKey ? createClient(url!, anonKey!) : undefined
+  enabled && isValidSupabaseUrl(url) && !!anonKey
+    ? createClient(url!, anonKey!, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+        },
+      })
+    : undefined
