@@ -51,7 +51,10 @@ const safeImageUrl = (value: unknown) => {
 }
 
 const looksLikeEquipment = (value: Record<string, unknown>) =>
-  ['nome', 'patrimonio', 'tipo', 'statusOperacional', 'status'].some((key) => key in value)
+  typeof value.nome === 'string' &&
+  typeof value.patrimonio === 'string' &&
+  typeof value.tipo === 'string' &&
+  typeof value.statusOperacional === 'string'
 
 const normalizeEquipment = (value: Record<string, unknown>): PublicEquipmentDTO => ({
   nome: textOrFallback(value.nome),
@@ -68,23 +71,39 @@ const normalizeEquipment = (value: Record<string, unknown>): PublicEquipmentDTO 
   atualizadoEm: textOrNull(value.atualizadoEm ?? value.updated_at),
 })
 
-/** Accepts the direct Edge Function response and supported state/data envelopes. */
+/** Accepts only the two response shapes returned by public-equipment. */
 export function normalizePublicEquipmentResponse(payload: unknown): PublicEquipmentLookupResult {
-  const outer = asRecord(payload)
-  if (!outer) return { kind: 'unavailable' }
-  const body = asRecord(outer.data) ?? outer
-  const state = textOrNull(body.state ?? outer.state)?.toUpperCase()
-
-  if (state === 'UNBOUND' || body.unlinked === true) return { kind: 'unlinked' }
-  if (state === 'REVOKED' || state === 'VOID' || state === 'NOT_FOUND') return { kind: 'not-found' }
-
-  const wrappedEquipment = asRecord(body.equipment) ?? asRecord(outer.equipment)
-  if (state === 'BOUND') {
-    return wrappedEquipment ? { kind: 'ready', equipment: normalizeEquipment(wrappedEquipment) } : { kind: 'unavailable' }
-  }
-  if (wrappedEquipment) return { kind: 'ready', equipment: normalizeEquipment(wrappedEquipment) }
+  const body = asRecord(payload)
+  if (!body) return { kind: 'unavailable' }
+  if (body.unlinked === true) return { kind: 'unlinked' }
   if (looksLikeEquipment(body)) return { kind: 'ready', equipment: normalizeEquipment(body) }
   return { kind: 'unavailable' }
+}
+
+export async function requestPublicEquipment(
+  token: string,
+  options: {
+    supabaseUrl: string
+    anonKey: string
+    signal?: AbortSignal
+    fetcher?: typeof fetch
+  },
+): Promise<PublicEquipmentLookupResult> {
+  const fetcher = options.fetcher ?? fetch
+  const response = await fetcher(`${options.supabaseUrl.replace(/\/$/, '')}/functions/v1/public-equipment`, {
+    method: 'POST',
+    cache: 'no-store',
+    signal: options.signal,
+    headers: {
+      apikey: options.anonKey,
+      authorization: `Bearer ${options.anonKey}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ token }),
+  })
+
+  if (!response.ok) return resolvePublicEquipmentInvocation(null, response.status)
+  return resolvePublicEquipmentInvocation(await response.json())
 }
 
 export function resolvePublicEquipmentInvocation(payload: unknown, errorStatus?: number): PublicEquipmentLookupResult {

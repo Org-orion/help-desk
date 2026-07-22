@@ -5,10 +5,9 @@ import { LOGO_SRC } from '@/config/branding'
 import {
   PUBLIC_EQUIPMENT_QR_UNAVAILABLE_MESSAGE,
   PUBLIC_EQUIPMENT_TOKEN_PATTERN,
-  resolvePublicEquipmentInvocation,
+  requestPublicEquipment,
   type PublicEquipmentDTO,
 } from '@/lib/public-equipment'
-import { supabase } from '@/lib/supabase'
 
 type ViewState =
   | { kind: 'loading' }
@@ -44,10 +43,12 @@ const PublicEquipment = () => {
       controller.abort()
       setState({ kind: 'unavailable' })
     }, 12000)
-    supabase.functions.invoke('public-equipment', { body: { token } }).then(({ data, error }) => {
+    requestPublicEquipment(token, {
+      supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+      anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      signal: controller.signal,
+    }).then((result) => {
       if (controller.signal.aborted) return
-      const status = error ? Number((error as { context?: { status?: number } }).context?.status) : undefined
-      const result = resolvePublicEquipmentInvocation(data, status)
       setState(result)
     }).catch((error: unknown) => {
       if (!(error instanceof DOMException && error.name === 'AbortError')) setState({ kind: 'unavailable' })
