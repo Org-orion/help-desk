@@ -7,13 +7,13 @@ export type PublicEquipmentDTO = {
   name: string
   assetCode: string
   type: string
-  brand: string | null
-  model: string | null
+  brand: string
+  model: string
   status: string
-  sector: string | null
-  ram: string | null
-  storage: string | null
-  cpu: string | null
+  sector: string
+  ram: string
+  storage: string
+  cpu: string
 }
 
 export type PublicEquipmentLookupResult =
@@ -27,10 +27,11 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 
 const requiredText = (value: unknown) => typeof value === 'string' ? value : null
 const optionalText = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null
+const displayText = (value: unknown) => optionalText(value) ?? 'Não informado'
 
 const normalizeEquipment = (value: Record<string, unknown>): PublicEquipmentDTO | null => {
   const name = requiredText(value.name)
-  const assetCode = requiredText(value.assetCode)
+  const assetCode = requiredText(value.assetCode ?? value.asset_code)
   const type = requiredText(value.type)
   const status = requiredText(value.status)
   if (name === null || assetCode === null || type === null || status === null) return null
@@ -39,13 +40,13 @@ const normalizeEquipment = (value: Record<string, unknown>): PublicEquipmentDTO 
     name: name.trim() || 'Não informado',
     assetCode: assetCode.trim() || 'Não informado',
     type: type.trim() || 'Não informado',
-    brand: optionalText(value.brand),
-    model: optionalText(value.model),
+    brand: displayText(value.brand),
+    model: displayText(value.model),
     status: status.trim() || 'Não informado',
-    sector: optionalText(value.sector),
-    ram: optionalText(value.ram),
-    storage: optionalText(value.storage),
-    cpu: optionalText(value.cpu),
+    sector: displayText(value.sector),
+    ram: displayText(value.ram),
+    storage: displayText(value.storage),
+    cpu: displayText(value.cpu),
   }
 }
 
@@ -65,23 +66,15 @@ export function normalizePublicEquipmentResponse(payload: unknown): PublicEquipm
 export async function requestPublicEquipment(
   token: string,
   options: {
-    supabaseUrl: string
-    anonKey: string
     signal?: AbortSignal
     fetcher?: typeof fetch
   },
 ): Promise<PublicEquipmentLookupResult> {
   const fetcher = options.fetcher ?? fetch
-  const response = await fetcher(`${options.supabaseUrl.replace(/\/$/, '')}/functions/v1/public-equipment`, {
-    method: 'POST',
+  const response = await fetcher(`/api/public/equipment/${encodeURIComponent(token)}`, {
+    method: 'GET',
     cache: 'no-store',
     signal: options.signal,
-    headers: {
-      apikey: options.anonKey,
-      authorization: `Bearer ${options.anonKey}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({ token }),
   })
 
   if (!response.ok) return resolvePublicEquipmentInvocation(null, response.status)

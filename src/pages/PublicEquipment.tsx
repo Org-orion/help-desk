@@ -24,7 +24,7 @@ const PublicEquipment = () => {
     setState({ kind: 'loading' })
     const controller = new AbortController()
     const timeout = window.setTimeout(() => { controller.abort(); setState({ kind: 'unavailable' }) }, 12000)
-    requestPublicEquipment(token, { supabaseUrl: import.meta.env.VITE_SUPABASE_URL, anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY, signal: controller.signal })
+    requestPublicEquipment(token, { signal: controller.signal })
       .then((result) => { if (!controller.signal.aborted) setState(result) })
       .catch((error: unknown) => { if (!(error instanceof DOMException && error.name === 'AbortError')) setState({ kind: 'unavailable' }) })
       .finally(() => window.clearTimeout(timeout))

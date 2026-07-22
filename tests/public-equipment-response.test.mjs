@@ -11,11 +11,17 @@ test('BOUND com todos os campos', () => {
   assert.deepEqual(result.equipment, equipment)
 })
 
+test('adapta asset_code para assetCode sem aceitar envelopes alternativos', () => {
+  const result = normalizePublicEquipmentResponse({ code: 'ok', state: 'BOUND', equipment: { ...equipment, assetCode: undefined, asset_code: 'PC-090' } })
+  assert.equal(result.kind, 'ready')
+  assert.equal(result.equipment.assetCode, 'PC-090')
+})
+
 test('BOUND aceita campos opcionais nulos ou ausentes', () => {
   const result = normalizePublicEquipmentResponse({ code: 'ok', state: 'BOUND', equipment: { name: 'Equipamento', assetCode: '001', type: 'Notebook', status: 'Ativo', brand: null, model: null, sector: null, ram: null, storage: null } })
   assert.equal(result.kind, 'ready')
-  assert.equal(result.equipment.brand, null)
-  assert.equal(result.equipment.cpu, null)
+  assert.equal(result.equipment.brand, 'Não informado')
+  assert.equal(result.equipment.cpu, 'Não informado')
 })
 
 test('UNBOUND não exige equipamento', () => {
@@ -46,10 +52,21 @@ test('não adivinha contratos alternativos', () => {
 
 test('requisição usa no-store e o contrato exato', async () => {
   let request
-  const result = await requestPublicEquipment('token-ficticio', { supabaseUrl: 'https://projeto.supabase.co', anonKey: 'chave-publica-ficticia', fetcher: async (url, init) => { request = { url, init }; return new Response(JSON.stringify(bound), { status: 200 }) } })
+  const result = await requestPublicEquipment('token-ficticio', { fetcher: async (url, init) => { request = { url, init }; return new Response(JSON.stringify(bound), { status: 200 }) } })
   assert.equal(result.kind, 'ready')
   assert.equal(request.init.cache, 'no-store')
-  assert.deepEqual(JSON.parse(request.init.body), { token: 'token-ficticio' })
+  assert.equal(request.url, '/api/public/equipment/token-ficticio')
+  assert.equal(request.init.method, 'GET')
+  assert.equal(request.init.body, undefined)
+})
+
+test('HTTP 500 retorna indisponibilidade temporária', async () => {
+  const result = await requestPublicEquipment('token-ficticio', { fetcher: async () => new Response(null, { status: 500 }) })
+  assert.equal(result.kind, 'unavailable')
+})
+
+test('falha real de rede é propagada para o estado de indisponibilidade da página', async () => {
+  await assert.rejects(() => requestPublicEquipment('token-ficticio', { fetcher: async () => { throw new TypeError('Failed to fetch') } }), TypeError)
 })
 
 test('contrato público não contém dados pessoais ou internos', () => {
