@@ -14,7 +14,7 @@
   ],
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/:path((?!api/public/equipment/).*)",
       "destination": "/index.html"
     }
   ]
