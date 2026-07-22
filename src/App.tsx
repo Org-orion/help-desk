@@ -25,6 +25,7 @@ import { ResponsiveLayout } from "@/components/ResponsiveLayout";
  
 
 const queryClient = new QueryClient();
+const isPublicEquipmentPath = /^\/consulta\/equipamento(?:\/[^/]+)?\/?$/.test(window.location.pathname);
 
 const LoginRoute = () => {
   const { isAuthenticated, user } = useAuth();
@@ -78,6 +79,7 @@ const router = createBrowserRouter([
 
 const App = () => {
   useEffect(() => {
+    if (isPublicEquipmentPath) return;
     (async () => {
       try {
         const verifyOnStart = (import.meta.env.VITE_SUPABASE_VERIFY_ON_START ?? '0') === '1'
@@ -108,6 +110,7 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    if (isPublicEquipmentPath) return;
     (async () => {
       try {
         const bootstrap = (import.meta.env.VITE_BOOTSTRAP_ADMIN ?? '0') === '1'
@@ -128,9 +131,13 @@ const App = () => {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Sonner />
-          <AuthProvider>
-            <RouterProvider router={router} future={{ v7_startTransition: true, v7_relativeSplatPath: true }} />
-          </AuthProvider>
+          {isPublicEquipmentPath ? (
+            <RouterProvider router={router} />
+          ) : (
+            <AuthProvider>
+              <RouterProvider router={router} future={{ v7_startTransition: true, v7_relativeSplatPath: true }} />
+            </AuthProvider>
+          )}
         </TooltipProvider>
       </QueryClientProvider>
     </ThemeProvider>

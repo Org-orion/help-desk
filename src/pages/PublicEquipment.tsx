@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Cpu, Database, HardDrive, MemoryStick, ShieldCheck } from 'lucide-react'
+import { Cpu, HardDrive, MemoryStick, RefreshCw, ShieldCheck } from 'lucide-react'
 import { LOGO_SRC } from '@/config/branding'
 import {
   PUBLIC_EQUIPMENT_QR_UNAVAILABLE_MESSAGE,
@@ -21,6 +21,7 @@ const PublicEquipment = () => {
   const [state, setState] = useState<ViewState>(
     PUBLIC_EQUIPMENT_TOKEN_PATTERN.test(token) ? { kind: 'loading' } : { kind: 'not-found' },
   )
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     document.title = 'Identificação de equipamento | CONCREM'
@@ -36,17 +37,29 @@ const PublicEquipment = () => {
       return
     }
 
+    setState({ kind: 'loading' })
     const controller = new AbortController()
+    const timeout = window.setTimeout(() => {
+      controller.abort()
+      setState({ kind: 'unavailable' })
+    }, 12000)
     supabase.functions.invoke('public-equipment', { body: { token } }).then(({ data, error }) => {
       if (controller.signal.aborted) return
-      if (error || !data) return setState({ kind: 'not-found' })
+      if (error) {
+        const status = Number((error as { context?: { status?: number } }).context?.status)
+        return setState(status === 404 ? { kind: 'not-found' } : { kind: 'unavailable' })
+      }
+      if (!data) return setState({ kind: 'unavailable' })
       if (data.unlinked === true) return setState({ kind: 'unlinked' })
       setState({ kind: 'ready', equipment: data as PublicEquipmentDTO })
     }).catch((error: unknown) => {
       if (!(error instanceof DOMException && error.name === 'AbortError')) setState({ kind: 'unavailable' })
-    })
-    return () => controller.abort()
-  }, [token])
+    }).finally(() => window.clearTimeout(timeout))
+    return () => {
+      controller.abort()
+      window.clearTimeout(timeout)
+    }
+  }, [token, attempt])
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-emerald-950 via-emerald-900 to-slate-950 px-4 py-8 sm:py-14">
@@ -58,8 +71,8 @@ const PublicEquipment = () => {
 
         <div className="px-6 py-8 sm:px-10">
           {state.kind === 'loading' && <PublicMessage title="Consultando equipamento" text="Aguarde um instante…" pulse />}
-          {state.kind === 'unavailable' && <PublicMessage title="Consulta em preparação" text={PUBLIC_EQUIPMENT_QR_UNAVAILABLE_MESSAGE} />}
-          {state.kind === 'not-found' && <PublicMessage title="Equipamento não encontrado" text="Este código é inválido, expirou ou foi revogado." />}
+          {state.kind === 'unavailable' && <PublicMessage title="Consulta temporariamente indisponível" text={PUBLIC_EQUIPMENT_QR_UNAVAILABLE_MESSAGE} action={<button type="button" onClick={() => setAttempt((value) => value + 1)} className="mx-auto mt-5 inline-flex items-center gap-2 rounded-xl bg-emerald-800 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-emerald-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2"><RefreshCw className="h-4 w-4" aria-hidden="true" />Tentar novamente</button>} />}
+          {state.kind === 'not-found' && <PublicMessage title="Etiqueta inválida ou não encontrada" text="Este código é inválido, expirou ou foi revogado." />}
           {state.kind === 'unlinked' && <PublicMessage title="Etiqueta CONCREM" text="Etiqueta ainda não vinculada a um equipamento." />}
           {state.kind === 'ready' && <EquipmentCard equipment={state.equipment} />}
         </div>
@@ -72,11 +85,12 @@ const PublicEquipment = () => {
   )
 }
 
-const PublicMessage = ({ title, text, pulse = false }: { title: string; text: string; pulse?: boolean }) => (
+const PublicMessage = ({ title, text, pulse = false, action }: { title: string; text: string; pulse?: boolean; action?: React.ReactNode }) => (
   <div className="py-10 text-center" role="status">
     <div className={`mx-auto mb-5 h-12 w-12 rounded-full bg-emerald-100 ${pulse ? 'animate-pulse' : ''}`} />
     <h1 className="text-xl font-bold text-slate-900">{title}</h1>
     <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-slate-600">{text}</p>
+    {action}
   </div>
 )
 
