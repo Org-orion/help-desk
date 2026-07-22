@@ -5,6 +5,7 @@ import { LOGO_SRC } from '@/config/branding'
 import {
   PUBLIC_EQUIPMENT_QR_UNAVAILABLE_MESSAGE,
   PUBLIC_EQUIPMENT_TOKEN_PATTERN,
+  resolvePublicEquipmentInvocation,
   type PublicEquipmentDTO,
 } from '@/lib/public-equipment'
 import { supabase } from '@/lib/supabase'
@@ -45,13 +46,9 @@ const PublicEquipment = () => {
     }, 12000)
     supabase.functions.invoke('public-equipment', { body: { token } }).then(({ data, error }) => {
       if (controller.signal.aborted) return
-      if (error) {
-        const status = Number((error as { context?: { status?: number } }).context?.status)
-        return setState(status === 404 ? { kind: 'not-found' } : { kind: 'unavailable' })
-      }
-      if (!data) return setState({ kind: 'unavailable' })
-      if (data.unlinked === true) return setState({ kind: 'unlinked' })
-      setState({ kind: 'ready', equipment: data as PublicEquipmentDTO })
+      const status = error ? Number((error as { context?: { status?: number } }).context?.status) : undefined
+      const result = resolvePublicEquipmentInvocation(data, status)
+      setState(result)
     }).catch((error: unknown) => {
       if (!(error instanceof DOMException && error.name === 'AbortError')) setState({ kind: 'unavailable' })
     }).finally(() => window.clearTimeout(timeout))
@@ -99,7 +96,7 @@ const EquipmentCard = ({ equipment }: { equipment: PublicEquipmentDTO }) => {
     { label: 'RAM', value: equipment.ram, icon: MemoryStick },
     { label: 'Armazenamento', value: equipment.armazenamento, icon: HardDrive },
     { label: 'CPU', value: equipment.cpu, icon: Cpu },
-  ].filter((item) => item.value)
+  ]
 
   return <article>
     {equipment.imagemPrincipalUrl && <img src={equipment.imagemPrincipalUrl} alt="Imagem do equipamento" className="mb-6 aspect-video w-full rounded-2xl object-cover" referrerPolicy="no-referrer" />}
@@ -111,11 +108,11 @@ const EquipmentCard = ({ equipment }: { equipment: PublicEquipmentDTO }) => {
       <Info label="Tipo" value={equipment.tipo} /><Info label="Marca" value={equipment.marca} />
       <Info label="Modelo" value={equipment.modelo} /><Info label="Setor" value={equipment.setor} />
     </dl>
-    {specs.length > 0 && <div className="mt-7 grid gap-3 sm:grid-cols-3">{specs.map(({ label, value, icon: Icon }) => <div key={label} className="rounded-xl bg-slate-50 p-3"><Icon className="mb-2 h-4 w-4 text-emerald-700" /><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-sm font-bold text-slate-900">{value}</p></div>)}</div>}
+    <div className="mt-7 grid gap-3 sm:grid-cols-3">{specs.map(({ label, value, icon: Icon }) => <div key={label} className="rounded-xl bg-slate-50 p-3"><Icon className="mb-2 h-4 w-4 text-emerald-700" /><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-sm font-bold text-slate-900">{value || 'Não informado'}</p></div>)}</div>
     {equipment.atualizadoEm && <p className="mt-7 text-center text-xs text-slate-400">Última atualização: {new Date(equipment.atualizadoEm).toLocaleDateString('pt-BR')}</p>}
   </article>
 }
 
-const Info = ({ label, value }: { label: string; value: string | null }) => value ? <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</dt><dd className="mt-1 font-semibold text-slate-800">{value}</dd></div> : null
+const Info = ({ label, value }: { label: string; value: string | null }) => <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</dt><dd className="mt-1 font-semibold text-slate-800">{value || 'Não informado'}</dd></div>
 
 export default PublicEquipment
