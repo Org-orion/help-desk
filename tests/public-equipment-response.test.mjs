@@ -3,6 +3,7 @@ import test from 'node:test'
 import { normalizePublicEquipmentResponse, requestPublicEquipment, resolvePublicEquipmentInvocation } from '../src/lib/public-equipment.ts'
 
 const equipment = { name: 'Equipamento', assetCode: '001', type: 'Notebook', brand: 'Marca', model: 'Modelo', status: 'Disponível', sector: 'TI', ram: '16 GB', storage: '512 GB', cpu: 'CPU' }
+equipment.images = []
 const bound = { code: 'ok', state: 'BOUND', equipment }
 
 test('BOUND com todos os campos', () => {
@@ -72,4 +73,11 @@ test('falha real de rede é propagada para o estado de indisponibilidade da pág
 test('contrato público não contém dados pessoais ou internos', () => {
   const serialized = JSON.stringify(bound).toLowerCase()
   for (const forbidden of ['responsavel', 'usuario', 'email', 'cpf', 'telefone', 'id', 'token', 'hash', 'historico', 'chamados', 'comentarios']) assert.equal(serialized.includes(`"${forbidden}"`), false)
+})
+
+test('BOUND aceita somente URLs e indicador principal, sem repetir imagens', () => {
+  const images = [{ url: 'https://storage.test/principal?token=1', principal: true }, { url: 'https://storage.test/outra?token=2', principal: false }]
+  const result = normalizePublicEquipmentResponse({ ...bound, equipment: { ...equipment, images: [...images, images[1], { storage_path: 'privado', principal: false }] } })
+  assert.equal(result.kind, 'ready')
+  assert.deepEqual(result.equipment.images, images)
 })

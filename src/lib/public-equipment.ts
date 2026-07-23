@@ -14,7 +14,10 @@ export type PublicEquipmentDTO = {
   ram: string
   storage: string
   cpu: string
+  images: PublicEquipmentImageDTO[]
 }
+
+export type PublicEquipmentImageDTO = { url: string; principal: boolean }
 
 export type PublicEquipmentLookupResult =
   | { kind: 'ready'; equipment: PublicEquipmentDTO }
@@ -35,6 +38,13 @@ const normalizeEquipment = (value: Record<string, unknown>): PublicEquipmentDTO 
   const type = requiredText(value.type)
   const status = requiredText(value.status)
   if (name === null || assetCode === null || type === null || status === null) return null
+  const seenUrls = new Set<string>()
+  const images = Array.isArray(value.images) ? value.images.flatMap((item) => {
+    const image = asRecord(item)
+    if (!image || typeof image.url !== 'string' || !image.url.trim() || typeof image.principal !== 'boolean' || seenUrls.has(image.url)) return []
+    seenUrls.add(image.url)
+    return [{ url: image.url, principal: image.principal }]
+  }) : []
 
   return {
     name: name.trim() || 'Não informado',
@@ -47,6 +57,7 @@ const normalizeEquipment = (value: Record<string, unknown>): PublicEquipmentDTO 
     ram: displayText(value.ram),
     storage: displayText(value.storage),
     cpu: displayText(value.cpu),
+    images,
   }
 }
 

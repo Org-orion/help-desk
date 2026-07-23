@@ -36,12 +36,16 @@ export type EquipamentoImagem = {
 export async function listEquipamentoImagens(equipamentoId: string): Promise<EquipamentoImagem[]> {
   const { data, error } = await supabase.from('equipamento_imagens').select('*').eq('equipamento_id', equipamentoId).order('principal', { ascending: false }).order('created_at')
   if (error) throw error
-  const images = data ?? []
+  const images = Array.from(
+    new Map((data ?? []).map((image) => [image.storage_path, image])).values(),
+  )
   if (!images.length) return []
   const { data: signed, error: signedError } = await supabase.storage.from(EQUIPMENT_IMAGES_BUCKET).createSignedUrls(images.map((image) => image.storage_path), 3600)
-  if (signedError) throw signedError
+  if (signedError) return []
   const urls = new Map((signed ?? []).map((item) => [item.path, item.signedUrl]))
-  return images.map((image) => ({ ...image, url: urls.get(image.storage_path) ?? '' })) as EquipamentoImagem[]
+  return images
+    .map((image) => ({ ...image, url: urls.get(image.storage_path) ?? '' }))
+    .filter((image) => Boolean(image.url)) as EquipamentoImagem[]
 }
 
 export async function uploadEquipamentoImagem(equipamentoId: string, file: File, principal: boolean): Promise<void> {

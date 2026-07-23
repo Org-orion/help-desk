@@ -183,6 +183,17 @@ const Equipamentos = () => {
     finally { setImagesLoading(false); }
   };
 
+  useEffect(() => {
+    if (!viewOpen || !selectedEquipment) return;
+    let active = true;
+    setImagesLoading(true);
+    listEquipamentoImagens(selectedEquipment.id)
+      .then((images) => { if (active) setSavedImages(images); })
+      .catch(() => { if (active) setSavedImages([]); })
+      .finally(() => { if (active) setImagesLoading(false); });
+    return () => { active = false; };
+  }, [viewOpen, selectedEquipment]);
+
   const handleAssetSheetOpenChange = (open: boolean) => {
     if (!open) {
       pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
@@ -890,6 +901,15 @@ const Equipamentos = () => {
           <ScrollArea className="flex-1">
             {selectedEquipment && (
               <div className="px-6 py-6 space-y-8">
+                {!imagesLoading && savedImages.length > 0 && (
+                  <section aria-label="Imagens do equipamento" className="flex snap-x gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:overflow-visible">
+                    {savedImages.map((image, index) => (
+                      <div key={image.id} className={cn('shrink-0 snap-start overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-900/40', index === 0 ? 'w-[82%] sm:col-span-2 sm:w-auto' : 'w-32 sm:w-auto')}>
+                        <img src={image.url} alt={image.principal ? 'Imagem principal do equipamento' : `Imagem ${index + 1} do equipamento`} loading="lazy" className={cn('w-full object-contain', index === 0 ? 'h-60' : 'h-32 sm:h-36')} onError={(event) => { event.currentTarget.parentElement?.remove(); }} />
+                      </div>
+                    ))}
+                  </section>
+                )}
                 <div className="grid grid-cols-2 gap-y-6 gap-x-4">
                   {[
                     { label: 'Tipo', value: selectedEquipment.tipo, icon: getTypeIcon(selectedEquipment.tipo) },
