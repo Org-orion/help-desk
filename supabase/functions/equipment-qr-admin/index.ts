@@ -1,6 +1,9 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-const ORIGIN = 'http://localhost:8082'
+const ALLOWED_ORIGINS = new Set([
+  'http://localhost:8082',
+  'https://helpdeskapp-six.vercel.app',
+])
 const CODE = /^[A-Z0-9]+(?:-[A-Z0-9]+)?$/
 const TOKEN = /^[A-Za-z0-9_-]{43}$/
 const json = (status: number, body: unknown, origin: string | null) => new Response(JSON.stringify(body), { status, headers: {
@@ -11,12 +14,12 @@ const sha256 = async (s: string) => Array.from(new Uint8Array(await crypto.subtl
 const token = () => { const b=new Uint8Array(32); crypto.getRandomValues(b); return btoa(String.fromCharCode(...b)).replaceAll('+','-').replaceAll('/','_').replaceAll('=','') }
 
 Deno.serve(async req => {
-  const origin=req.headers.get('origin'); const allowed=origin===ORIGIN?origin:null
+  const origin=req.headers.get('origin'); const allowed=origin&&ALLOWED_ORIGINS.has(origin)?origin:null
   if(origin&&!allowed)return json(403,{error:'Acesso não autorizado.'},null)
   if(req.method==='OPTIONS')return allowed?new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':allowed,'Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type, x-retry-count','Access-Control-Allow-Methods':'POST, OPTIONS','Vary':'Origin'}}):json(403,{error:'Acesso não autorizado.'},null)
   if(req.method!=='POST')return json(405,{error:'Método não permitido.'},allowed)
   const url=Deno.env.get('SUPABASE_URL'), key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'), salt=Deno.env.get('AUTH_RATE_LIMIT_SALT'), base=Deno.env.get('PUBLIC_APP_URL')
-  if(!url||!key||!salt||base!==ORIGIN)return json(503,{error:'Serviço temporariamente indisponível.'},allowed)
+  if(!url||!key||!salt||!base||!ALLOWED_ORIGINS.has(base))return json(503,{error:'Serviço temporariamente indisponível.'},allowed)
   const admin=createClient(url,key,{auth:{persistSession:false}})
   const bearer=req.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1]
   if(!bearer)return json(401,{error:'Acesso não autorizado.'},allowed)

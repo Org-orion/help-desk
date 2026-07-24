@@ -18,6 +18,7 @@ export type Equipamento = {
   processador?: string
   polegadas?: string
   ghz?: string
+  equipamento_pai_id?: string | null
   created_at?: string
 }
 
@@ -89,24 +90,71 @@ export async function listEquipamentos(): Promise<Equipamento[]> {
   return (data ?? []) as Equipamento[]
 }
 
+export async function validateEquipamentoVinculo(
+  equipamentoId: string | undefined,
+  equipamentoPaiId: string | null | undefined,
+): Promise<void> {
+  if (!equipamentoPaiId) return
+  if (equipamentoId && equipamentoId === equipamentoPaiId) {
+    throw new Error('Um equipamento não pode ser vinculado a ele mesmo.')
+  }
+
+  const { data: parent, error: parentError } = await supabase
+    .from('equipamentos')
+    .select('id,equipamento_pai_id')
+    .eq('id', equipamentoPaiId)
+    .maybeSingle()
+  if (parentError) throw parentError
+  if (!parent) throw new Error('O equipamento principal selecionado não foi encontrado.')
+  if (parent.equipamento_pai_id) {
+    throw new Error('Um equipamento vinculado não pode ser selecionado como equipamento principal.')
+  }
+
+  if (equipamentoId) {
+    const { data: children, error: childrenError } = await supabase
+      .from('equipamentos')
+      .select('id')
+      .eq('equipamento_pai_id', equipamentoId)
+      .neq('id', equipamentoId)
+      .limit(1)
+    if (childrenError) throw childrenError
+    if (children?.length) {
+      throw new Error('Um equipamento que possui vinculados não pode ser vinculado a outro equipamento.')
+    }
+  }
+}
+
+function equipmentLinkError(error: { message?: string }): Error {
+  const message = String(error?.message ?? '')
+  if (message.includes('EQUIPMENT_LINK_SELF')) return new Error('Um equipamento não pode ser vinculado a ele mesmo.')
+  if (message.includes('EQUIPMENT_LINK_PARENT_NOT_FOUND')) return new Error('O equipamento principal selecionado não foi encontrado.')
+  if (message.includes('EQUIPMENT_LINK_PARENT_IS_LINKED')) return new Error('Um equipamento vinculado não pode ser selecionado como equipamento principal.')
+  if (message.includes('EQUIPMENT_LINK_CHILD_HAS_LINKS')) return new Error('Um equipamento que possui vinculados não pode ser vinculado a outro equipamento.')
+  return error instanceof Error ? error : new Error(message || 'Não foi possível salvar o vínculo entre equipamentos.')
+}
+
 export async function createEquipamento(input: Omit<Equipamento, 'id' | 'created_at'>): Promise<Equipamento> {
+  await validateEquipamentoVinculo(undefined, input.equipamento_pai_id)
   const { data, error } = await supabase
     .from('equipamentos')
     .insert(input)
     .select('*')
     .single()
-  if (error) throw error
+  if (error) throw equipmentLinkError(error)
   return data as Equipamento
 }
 
 export async function updateEquipamento(id: string, input: Partial<Omit<Equipamento, 'id' | 'created_at'>>): Promise<Equipamento> {
+  if (Object.prototype.hasOwnProperty.call(input, 'equipamento_pai_id')) {
+    await validateEquipamentoVinculo(id, input.equipamento_pai_id)
+  }
   const { data, error } = await supabase
     .from('equipamentos')
     .update(input)
     .eq('id', id)
     .select('*')
     .single()
-  if (error) throw error
+  if (error) throw equipmentLinkError(error)
   return data as Equipamento
 }
 

@@ -18,7 +18,7 @@ import {
   MoreHorizontal, Laptop, Monitor, Smartphone, Tablet, Cpu, Package,
   User as UserIcon, Building2, Activity, CheckCircle2, XCircle, Eye,
   LayoutGrid, List, SlidersHorizontal, ChevronRight, Hash, HardDrive, 
-  Settings2, ArrowRight, Upload, Image as ImageIcon, X, Star, QrCode, Download
+  Settings2, ArrowRight, Upload, Image as ImageIcon, X, Star, QrCode, Download, Link2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -44,6 +44,14 @@ import { EquipmentQrBindExistingDialog } from '@/components/equipment-qr/Equipme
 import { EquipmentQrManageDialog } from '@/components/equipment-qr/EquipmentQrManageDialog';
 import { EQUIPMENT_QR_LABELS_UNAVAILABLE_MESSAGE, type EquipmentQrLookupDTO } from '@/lib/equipment-qr-labels';
 import { ConfirmDeleteModal } from '@/components/shared/ConfirmDeleteModal';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import {
+  getEquipamentoPrincipal,
+  listEquipamentosPrincipaisDisponiveis,
+  listEquipamentosVinculados,
+  validateEquipamentoVinculoLocal,
+  type EquipamentoVinculoResumo,
+} from '@/lib/equipment-links';
 
 type Equipment = EquipamentoType;
 
@@ -55,7 +63,7 @@ const MAX_IMAGES = 5;
 const emptyEquipmentForm = () => ({
   nome: '', tipo: 'Notebook', patrimonio: '', marca: '', modelo: '',
   status: 'Disponível' as Equipment['status'], usuario: '', setor: '', ram: '',
-  armazenamento: '', processador: '', polegadas: '', ghz: '',
+  armazenamento: '', processador: '', polegadas: '', ghz: '', equipamento_pai_id: null as string | null,
 });
 
 const safeFilePart = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'equipamento';
@@ -151,6 +159,7 @@ const Equipamentos = () => {
   const [manageQrEquipment, setManageQrEquipment] = useState<Equipment | null>(null);
   const [qrSubmitting, setQrSubmitting] = useState(false);
   const [equipmentToDelete, setEquipmentToDelete] = useState<Equipment | null>(null);
+  const [pendingEquipmentUpdate, setPendingEquipmentUpdate] = useState<{ id: string; input: Partial<Equipment> } | null>(null);
   const deleteMenuTriggerRef = useRef<HTMLElement>(null);
 
   const [newUser, setNewUser] = useState({ nome: '', username: '', setor: '', password: '', tipo: 'padrao' as 'padrao' | 'vip' | 'admin' });
@@ -243,6 +252,20 @@ const Equipamentos = () => {
     manutencao: equipamentos.filter(e => e.status === 'Manutenção').length,
   }), [equipamentos]);
 
+  const eligibleParentEquipments = useMemo(
+    () => listEquipamentosPrincipaisDisponiveis(
+      equipamentos,
+      assetSheetMode === 'edit' ? selectedEquipment?.id : undefined,
+    ),
+    [assetSheetMode, equipamentos, selectedEquipment?.id],
+  );
+  const selectedParentEquipment = selectedEquipment
+    ? getEquipamentoPrincipal(selectedEquipment, equipamentos)
+    : null;
+  const selectedLinkedEquipments = selectedEquipment
+    ? listEquipamentosVinculados(selectedEquipment.id, equipamentos)
+    : [];
+
   // Mutations
   const createMut = useMutation({
     mutationFn: createEquipamento,
@@ -257,7 +280,8 @@ const Equipamentos = () => {
       setSuccessOpen(true);
       toast.success('Equipamento registrado com sucesso');
       if (pendingImages.length) toast.error('Equipamento cadastrado, mas as imagens não foram enviadas: armazenamento seguro ainda não configurado.');
-    }
+    },
+    onError: (error: Error) => toast.error(error.message || 'Falha ao registrar o equipamento. Tente novamente.'),
   });
 
   const updateMut = useMutation({
@@ -298,6 +322,7 @@ const Equipamentos = () => {
       usuario: e.usuario || '', setor: (e.setor || '').toUpperCase(),
       ram: e.ram || '', armazenamento: e.armazenamento || '',
       processador: e.processador || '', polegadas: e.polegadas || '', ghz: e.ghz || '',
+      equipamento_pai_id: e.equipamento_pai_id || null,
     });
     setAssetSheetMode('edit');
     setAssetSheetOpen(true);
@@ -339,6 +364,40 @@ const Equipamentos = () => {
     } finally {
       setQrSubmitting(false);
     }
+  };
+
+  const submitEquipmentForm = () => {
+    const equipmentId = assetSheetMode === 'edit' ? selectedEquipment?.id : undefined;
+    const validationError = validateEquipamentoVinculoLocal(
+      equipmentId,
+      formData.equipamento_pai_id,
+      equipamentos,
+    );
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
+    if (assetSheetMode === 'create') {
+      if (pendingQrLabel) void submitQrBoundEquipment();
+      else createMut.mutate(formData);
+      return;
+    }
+    if (!selectedEquipment) return;
+
+    const currentParentId = selectedEquipment.equipamento_pai_id ?? null;
+    const nextParentId = formData.equipamento_pai_id ?? null;
+    const update = { id: selectedEquipment.id, input: formData as Partial<Equipment> };
+    if (currentParentId !== nextParentId) {
+      setPendingEquipmentUpdate(update);
+      return;
+    }
+    updateMut.mutate(update);
+  };
+
+  const openEquipmentDetails = (equipment: Equipment) => {
+    setSelectedEquipment(equipment);
+    setViewOpen(true);
   };
 
   const handleSavedMainImage = async (image: EquipamentoImagem) => {
@@ -517,7 +576,7 @@ const Equipamentos = () => {
           <Button type="button" variant="outline" onClick={() => setQrScannerOpen(true)} className="h-12 rounded-xl"><QrCode className="h-5 w-5" />Escanear etiqueta QR</Button>
           <Button type="button" variant="outline" onClick={() => setQrBatchOpen(true)} className="h-12 rounded-xl"><Printer className="h-5 w-5" />Gerar etiquetas QR</Button>
           <Button
-            onClick={() => { setPendingQrLabel(null); setAssetSheetMode('create'); setAssetSheetOpen(true); }}
+            onClick={() => { setPendingQrLabel(null); setFormData({ ...formData, equipamento_pai_id: null }); setAssetSheetMode('create'); setAssetSheetOpen(true); }}
             className="h-12 px-6 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             <Plus className="w-5 h-5 mr-2" />
@@ -667,7 +726,8 @@ const Equipamentos = () => {
               <EquipmentItem 
                 key={eq.id} 
                 equipment={eq} 
-                onView={() => { setSelectedEquipment(eq); setViewOpen(true); }}
+                parentEquipment={getEquipamentoPrincipal(eq, equipamentos)}
+                onView={() => openEquipmentDetails(eq)}
                 onEdit={() => handleEdit(eq)}
                 onDelete={(trigger: HTMLElement | null) => {
                   deleteMenuTriggerRef.current = trigger;
@@ -694,6 +754,22 @@ const Equipamentos = () => {
         }}
       />
 
+      <ConfirmDialog
+        open={Boolean(pendingEquipmentUpdate)}
+        onOpenChange={(open) => {
+          if (!open) setPendingEquipmentUpdate(null);
+        }}
+        title={pendingEquipmentUpdate?.input.equipamento_pai_id ? 'Alterar vínculo do equipamento?' : 'Remover vínculo do equipamento?'}
+        description={pendingEquipmentUpdate?.input.equipamento_pai_id
+          ? `O equipamento passará a ser vinculado a ${equipamentos.find((item) => item.id === pendingEquipmentUpdate.input.equipamento_pai_id)?.patrimonio || 'outro equipamento'}. Deseja continuar?`
+          : 'O equipamento deixará de estar vinculado ao equipamento principal atual. Deseja continuar?'}
+        confirmLabel="Confirmar alteração"
+        onConfirm={() => {
+          if (pendingEquipmentUpdate) updateMut.mutate(pendingEquipmentUpdate);
+          setPendingEquipmentUpdate(null);
+        }}
+      />
+
       {/* ── Asset (Create/Edit) — Side Sheet ───────────────────────────────── */}
       <Sheet open={assetSheetOpen} onOpenChange={handleAssetSheetOpenChange}>
         <SheetContent side="right" className="w-full sm:max-w-[540px] p-0 flex flex-col bg-white dark:bg-[#061C14] border-l border-slate-200 dark:border-emerald-900/40">
@@ -711,12 +787,7 @@ const Equipamentos = () => {
               id="asset-form"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (assetSheetMode === 'create') {
-                  if (pendingQrLabel) void submitQrBoundEquipment();
-                  else createMut.mutate(formData as any);
-                } else if (selectedEquipment) {
-                  updateMut.mutate({ id: selectedEquipment.id, input: formData as any });
-                }
+                submitEquipmentForm();
               }}
               className="px-6 py-6 space-y-8"
             >
@@ -825,6 +896,22 @@ const Equipamentos = () => {
                 </div>
               </div>
 
+              {!pendingQrLabel && (
+                <>
+                  {/* Section 4: Vínculo */}
+                  <div className="space-y-4">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Vínculo entre Equipamentos</p>
+                    <EquipmentLinkField
+                      value={formData.equipamento_pai_id}
+                      candidates={eligibleParentEquipments}
+                      selected={equipamentos.find((item) => item.id === formData.equipamento_pai_id) ?? null}
+                      disabled={assetSheetMode === 'edit' && listEquipamentosVinculados(selectedEquipment?.id || '', equipamentos).length > 0}
+                      onChange={(equipamentoPaiId) => setFormData({ ...formData, equipamento_pai_id: equipamentoPaiId })}
+                    />
+                  </div>
+                </>
+              )}
+
               {(
                 <div className="space-y-4">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Imagens do Equipamento</p>
@@ -927,6 +1014,53 @@ const Equipamentos = () => {
                     </div>
                   ))}
                 </div>
+
+                {selectedParentEquipment && (
+                  <div className="pt-6 border-t border-slate-100 dark:border-emerald-900/20">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Vinculado ao equipamento</p>
+                    <button
+                      type="button"
+                      onClick={() => openEquipmentDetails(selectedParentEquipment)}
+                      className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-mono text-sm font-bold text-primary">{selectedParentEquipment.patrimonio}</p>
+                        <p className="mt-1 truncate text-sm font-semibold text-slate-900">{selectedParentEquipment.nome}</p>
+                        <p className="mt-1 text-xs text-slate-500">{formatEquipmentLinkDetails(selectedParentEquipment)}</p>
+                      </div>
+                      <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
+                    </button>
+                  </div>
+                )}
+
+                {selectedLinkedEquipments.length > 0 && (
+                  <div className="pt-6 border-t border-slate-100 dark:border-emerald-900/20">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Equipamentos vinculados</p>
+                      <Badge variant="outline">{selectedLinkedEquipments.length}</Badge>
+                    </div>
+                    <div className="space-y-2">
+                      {selectedLinkedEquipments.map((linked) => (
+                        <button
+                          key={linked.id}
+                          type="button"
+                          onClick={() => openEquipmentDetails(linked)}
+                          className="flex w-full items-center justify-between rounded-xl border border-slate-200 p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono text-sm font-bold text-primary">{linked.patrimonio}</span>
+                              <Badge variant="outline" className={cn("px-2 py-0.5 text-[10px]", getStatusConfig(linked.status).color)}>{linked.status}</Badge>
+                            </div>
+                            <p className="mt-1 truncate text-sm font-semibold text-slate-900">{linked.nome}</p>
+                            <p className="mt-1 text-xs text-slate-500">{formatEquipmentLinkDetails(linked)}</p>
+                          </div>
+                          <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="pt-6 border-t border-slate-100 dark:border-emerald-900/20">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-4">Hardware & Specs</p>
@@ -1121,7 +1255,99 @@ const FilterChip = ({ active, label, icon: Icon, onClick }: any) => (
   </button>
 );
 
-const EquipmentItem = ({ equipment, onView, onEdit, onDelete, onPrint, onQrCode }: any) => {
+const formatEquipmentLinkDetails = (equipment: EquipamentoVinculoResumo) =>
+  [equipment.tipo, equipment.marca, equipment.modelo].filter(Boolean).join(' · ');
+
+const EquipmentLinkField = ({
+  value,
+  candidates,
+  selected,
+  disabled,
+  onChange,
+}: {
+  value: string | null;
+  candidates: Equipment[];
+  selected: Equipment | null;
+  disabled: boolean;
+  onChange: (equipmentId: string | null) => void;
+}) => {
+  const [search, setSearch] = useState('');
+  const normalizedSearch = search.trim().toLocaleLowerCase('pt-BR');
+  const options = candidates
+    .filter((equipment) => {
+      if (!normalizedSearch) return true;
+      return [
+        equipment.patrimonio,
+        equipment.nome,
+        equipment.tipo,
+        equipment.marca,
+        equipment.modelo,
+      ].some((field) => (field || '').toLocaleLowerCase('pt-BR').includes(normalizedSearch));
+    })
+    .slice(0, 8);
+
+  return (
+    <div className="space-y-3">
+      <Label htmlFor="equipment-link-search">Vincular a outro equipamento <span className="font-normal text-slate-400">(opcional)</span></Label>
+      {selected ? (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
+          <div className="min-w-0">
+            <p className="truncate font-mono text-sm font-bold text-primary">{selected.patrimonio} — {selected.nome}</p>
+            <p className="mt-1 truncate text-xs text-slate-500">{formatEquipmentLinkDetails(selected)}</p>
+          </div>
+          <Button type="button" variant="ghost" size="icon" disabled={disabled} aria-label="Remover vínculo" onClick={() => onChange(null)} className="h-8 w-8 shrink-0 text-slate-500 hover:text-red-600">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      ) : (
+        <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">Sem vínculo com outro equipamento.</p>
+      )}
+
+      {disabled ? (
+        <p className="text-xs leading-5 text-amber-700">Este equipamento possui equipamentos vinculados e, por isso, deve permanecer como principal.</p>
+      ) : (
+        <>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              id="equipment-link-search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="bg-slate-50 pl-9 dark:bg-slate-900/50"
+              placeholder="Buscar por patrimônio, nome, tipo, marca ou modelo"
+            />
+          </div>
+          <div className="max-h-44 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-1">
+            {options.length ? options.map((equipment) => (
+              <button
+                key={equipment.id}
+                type="button"
+                aria-pressed={value === equipment.id}
+                onClick={() => {
+                  onChange(equipment.id);
+                  setSearch('');
+                }}
+                className={cn(
+                  'w-full rounded-lg px-3 py-2 text-left transition-colors hover:bg-slate-50',
+                  value === equipment.id && 'bg-primary/5',
+                )}
+              >
+                <p className="truncate text-sm font-semibold text-slate-900">
+                  <span className="font-mono text-primary">{equipment.patrimonio}</span> — {equipment.nome}
+                </p>
+                <p className="mt-0.5 truncate text-xs text-slate-500">{equipment.tipo}</p>
+              </button>
+            )) : (
+              <p className="px-3 py-4 text-center text-xs text-slate-500">Nenhum equipamento principal disponível.</p>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+const EquipmentItem = ({ equipment, parentEquipment, onView, onEdit, onDelete, onPrint, onQrCode }: any) => {
   const status = getStatusConfig(equipment.status);
   const TypeIcon = getTypeIcon(equipment.tipo);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
@@ -1152,6 +1378,12 @@ const EquipmentItem = ({ equipment, onView, onEdit, onDelete, onPrint, onQrCode 
               <Building2 className="w-3.5 h-3.5" />
               <span className="text-sm font-medium">{equipment.setor || 'N/A'}</span>
             </div>
+            {parentEquipment && (
+              <div className="flex items-center gap-2 text-primary/80">
+                <Link2 className="h-3.5 w-3.5" />
+                <span className="text-xs font-semibold">Vinculado ao {parentEquipment.patrimonio}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
