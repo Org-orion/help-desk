@@ -491,7 +491,7 @@ const Equipamentos = () => {
         }
       }));
       const photos = photoResults.filter((photo): photo is ResponsibilityTermPhoto => photo !== null);
-      appendEquipmentPhotoPages(doc, eq, photos);
+      appendEquipmentPhotoPages(doc, eq, photos, { watermark });
 
       const fileName = `termo-${(eq.patrimonio || eq.nome || 'equipamento')
         .toString()

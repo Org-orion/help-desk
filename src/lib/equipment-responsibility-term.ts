@@ -231,52 +231,43 @@ const getPhotoFormat = (dataUrl: string) => {
   return 'JPEG'
 }
 
+const drawPhotoPageBackground = (doc: jsPDF, watermark?: string | HTMLImageElement) => {
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  doc.setDrawColor('#00B050')
+  doc.setLineWidth(0.55)
+  doc.rect(8.5, 8.5, pageWidth - 17, pageHeight - 17)
+
+  if (watermark) {
+    doc.setGState(new doc.GState({ opacity: 0.1 }))
+    doc.addImage(watermark, 'PNG', -14, 91, 139, 139, undefined, 'FAST')
+    doc.setGState(new doc.GState({ opacity: 1 }))
+  }
+}
+
 export const appendEquipmentPhotoPages = (
   doc: jsPDF,
-  equipment: ResponsibilityTermEquipment,
+  _equipment: ResponsibilityTermEquipment,
   photos: ResponsibilityTermPhoto[],
+  assets: Pick<ResponsibilityTermAssets, 'watermark'> = {},
 ) => {
   if (!photos.length) return doc
 
   const pageWidth = doc.internal.pageSize.getWidth()
   const marginX = 18
   const columnGap = 8
-  const rowGap = 10
+  const rowGap = 8
   const frameWidth = (pageWidth - marginX * 2 - columnGap) / 2
-  const frameHeight = 96
-  const photosTop = 58
+  const photosTop = 42
   const imagePadding = 4
   const captionHeight = 8
   const photosPerPage = 4
 
   for (let pageStart = 0; pageStart < photos.length; pageStart += photosPerPage) {
+    const isLastPhotoPage = pageStart + photosPerPage >= photos.length
+    const frameHeight = isLastPhotoPage ? 91 : 96
     doc.addPage()
-    doc.setTextColor(0)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(15)
-    doc.text('REGISTRO FOTOGRÁFICO DO EQUIPAMENTO', pageWidth / 2, 22, { align: 'center' })
-
-    const identification: string[] = []
-    const patrimonio = clean(equipment.patrimonio)
-    const nome = clean(equipment.nome)
-    const tipo = clean(equipment.tipo)
-    const marca = clean(equipment.marca)
-    const modelo = clean(equipment.modelo)
-    const equipmentBaseName = nome || tipo
-    const equipmentName = [
-      equipmentBaseName,
-      marca && !equipmentBaseName.toLocaleLowerCase('pt-BR').includes(marca.toLocaleLowerCase('pt-BR')) ? marca : '',
-    ].filter(Boolean).join(' ')
-    if (patrimonio) identification.push(`Patrimônio: ${patrimonio}`)
-    if (equipmentName) identification.push(`Equipamento: ${equipmentName}`)
-    if (modelo) identification.push(`Modelo: ${modelo}`)
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(10)
-    identification.forEach((line, index) => doc.text(line, marginX, 32 + index * 5))
-    doc.setDrawColor(210)
-    doc.setLineWidth(0.3)
-    doc.line(marginX, 51, pageWidth - marginX, 51)
+    drawPhotoPageBackground(doc, assets.watermark)
 
     photos.slice(pageStart, pageStart + photosPerPage).forEach((photo, pageIndex) => {
       const column = pageIndex % 2
@@ -298,6 +289,16 @@ export const appendEquipmentPhotoPages = (
       doc.setTextColor(90)
       doc.text(`Foto ${pageStart + pageIndex + 1}`, frameX + frameWidth / 2, frameY + frameHeight - 3, { align: 'center' })
     })
+
+    if (isLastPhotoPage) {
+      doc.setDrawColor(210)
+      doc.setLineWidth(0.3)
+      doc.line(marginX, 238, pageWidth - marginX, 238)
+      doc.setTextColor(0)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(12)
+      doc.text('REGISTRO FOTOGRÁFICO DO EQUIPAMENTO', pageWidth / 2, 247, { align: 'center' })
+    }
   }
 
   doc.setTextColor(0)
