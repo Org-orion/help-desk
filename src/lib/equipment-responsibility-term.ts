@@ -19,6 +19,13 @@ export type ResponsibilityTermAssets = {
   watermark?: string | HTMLImageElement
 }
 
+export type ResponsibilityTermPhoto = {
+  dataUrl: string
+  width: number
+  height: number
+  name?: string
+}
+
 const MONTHS_PT_BR = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
@@ -201,5 +208,98 @@ export const createEquipmentResponsibilityTermPdf = (
   doc.text('Rod. BR-010, Km 31, Interior - Cep 68633-000 Dom Eliseu-PA - Tel: (94) 98114-2020', pageWidth / 2, 280.5, { align: 'center' })
   doc.text('CNPJ: 18.543.638/0001-34 - IE: 15.417.865-9', pageWidth / 2, 285, { align: 'center' })
 
+  return doc
+}
+
+export const orderEquipmentPhotosPrincipalFirst = <T extends { principal: boolean }>(photos: T[]) =>
+  [...photos].sort((first, second) => Number(second.principal) - Number(first.principal))
+
+export const fitResponsibilityTermPhoto = (
+  imageWidth: number,
+  imageHeight: number,
+  maxWidth: number,
+  maxHeight: number,
+) => {
+  if (imageWidth <= 0 || imageHeight <= 0) return { width: 0, height: 0 }
+  const scale = Math.min(maxWidth / imageWidth, maxHeight / imageHeight)
+  return { width: imageWidth * scale, height: imageHeight * scale }
+}
+
+const getPhotoFormat = (dataUrl: string) => {
+  if (dataUrl.startsWith('data:image/png')) return 'PNG'
+  if (dataUrl.startsWith('data:image/webp')) return 'WEBP'
+  return 'JPEG'
+}
+
+export const appendEquipmentPhotoPages = (
+  doc: jsPDF,
+  equipment: ResponsibilityTermEquipment,
+  photos: ResponsibilityTermPhoto[],
+) => {
+  if (!photos.length) return doc
+
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const marginX = 18
+  const columnGap = 8
+  const rowGap = 10
+  const frameWidth = (pageWidth - marginX * 2 - columnGap) / 2
+  const frameHeight = 96
+  const photosTop = 58
+  const imagePadding = 4
+  const captionHeight = 8
+  const photosPerPage = 4
+
+  for (let pageStart = 0; pageStart < photos.length; pageStart += photosPerPage) {
+    doc.addPage()
+    doc.setTextColor(0)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(15)
+    doc.text('REGISTRO FOTOGRÁFICO DO EQUIPAMENTO', pageWidth / 2, 22, { align: 'center' })
+
+    const identification: string[] = []
+    const patrimonio = clean(equipment.patrimonio)
+    const nome = clean(equipment.nome)
+    const tipo = clean(equipment.tipo)
+    const marca = clean(equipment.marca)
+    const modelo = clean(equipment.modelo)
+    const equipmentBaseName = nome || tipo
+    const equipmentName = [
+      equipmentBaseName,
+      marca && !equipmentBaseName.toLocaleLowerCase('pt-BR').includes(marca.toLocaleLowerCase('pt-BR')) ? marca : '',
+    ].filter(Boolean).join(' ')
+    if (patrimonio) identification.push(`Patrimônio: ${patrimonio}`)
+    if (equipmentName) identification.push(`Equipamento: ${equipmentName}`)
+    if (modelo) identification.push(`Modelo: ${modelo}`)
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    identification.forEach((line, index) => doc.text(line, marginX, 32 + index * 5))
+    doc.setDrawColor(210)
+    doc.setLineWidth(0.3)
+    doc.line(marginX, 51, pageWidth - marginX, 51)
+
+    photos.slice(pageStart, pageStart + photosPerPage).forEach((photo, pageIndex) => {
+      const column = pageIndex % 2
+      const row = Math.floor(pageIndex / 2)
+      const frameX = marginX + column * (frameWidth + columnGap)
+      const frameY = photosTop + row * (frameHeight + rowGap)
+      const maxImageWidth = frameWidth - imagePadding * 2
+      const maxImageHeight = frameHeight - imagePadding * 2 - captionHeight
+      const fitted = fitResponsibilityTermPhoto(photo.width, photo.height, maxImageWidth, maxImageHeight)
+      const imageX = frameX + (frameWidth - fitted.width) / 2
+      const imageY = frameY + imagePadding + (maxImageHeight - fitted.height) / 2
+
+      doc.setDrawColor(190)
+      doc.setLineWidth(0.3)
+      doc.roundedRect(frameX, frameY, frameWidth, frameHeight, 1.5, 1.5)
+      doc.addImage(photo.dataUrl, getPhotoFormat(photo.dataUrl), imageX, imageY, fitted.width, fitted.height, undefined, 'MEDIUM')
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(90)
+      doc.text(`Foto ${pageStart + pageIndex + 1}`, frameX + frameWidth / 2, frameY + frameHeight - 3, { align: 'center' })
+    })
+  }
+
+  doc.setTextColor(0)
   return doc
 }

@@ -51,7 +51,12 @@ import {
   validateEquipamentoVinculoLocal,
   type EquipamentoVinculoResumo,
 } from '@/lib/equipment-links';
-import { createEquipmentResponsibilityTermPdf } from '@/lib/equipment-responsibility-term';
+import {
+  appendEquipmentPhotoPages,
+  createEquipmentResponsibilityTermPdf,
+  orderEquipmentPhotosPrincipalFirst,
+  type ResponsibilityTermPhoto,
+} from '@/lib/equipment-responsibility-term';
 
 type Equipment = EquipamentoType;
 
@@ -74,6 +79,40 @@ const loadTermImage = (src: string) => new Promise<HTMLImageElement>((resolve, r
   image.onerror = () => reject(new Error(`Não foi possível carregar a imagem do termo: ${src}`));
   image.src = src;
 });
+
+const loadEquipmentPhotoForPdf = async (image: EquipamentoImagem): Promise<ResponsibilityTermPhoto> => {
+  const response = await fetch(image.url, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Falha HTTP ${response.status}`);
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+
+  try {
+    const source = await loadTermImage(objectUrl);
+    const sourceWidth = source.naturalWidth || source.width;
+    const sourceHeight = source.naturalHeight || source.height;
+    if (!sourceWidth || !sourceHeight) throw new Error('Imagem sem dimensões válidas.');
+
+    const maxDimension = 1800;
+    const scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+    canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Não foi possível preparar a imagem para o PDF.');
+    context.fillStyle = '#FFFFFF';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(source, 0, 0, canvas.width, canvas.height);
+
+    return {
+      dataUrl: canvas.toDataURL('image/jpeg', 0.88),
+      width: sourceWidth,
+      height: sourceHeight,
+      name: image.nome_arquivo,
+    };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+};
 
 // ── Status Styling ──────────────────────────────────────────────────────────
 
@@ -435,6 +474,24 @@ const Equipamentos = () => {
         loadTermImage('/responsibility-term/watermark.png'),
       ]);
       const doc = createEquipmentResponsibilityTermPdf(eq, new Date(), { logo, watermark });
+
+      let equipmentImages: EquipamentoImagem[] = [];
+      try {
+        equipmentImages = orderEquipmentPhotosPrincipalFirst(await listEquipamentoImagens(eq.id));
+      } catch (imageListError) {
+        console.error(`Não foi possível carregar as imagens do equipamento ${eq.id}.`, imageListError);
+      }
+
+      const photoResults = await Promise.all(equipmentImages.map(async (image) => {
+        try {
+          return await loadEquipmentPhotoForPdf(image);
+        } catch (photoError) {
+          console.error(`Não foi possível incluir a imagem ${image.id} do equipamento ${eq.id} no termo.`, photoError);
+          return null;
+        }
+      }));
+      const photos = photoResults.filter((photo): photo is ResponsibilityTermPhoto => photo !== null);
+      appendEquipmentPhotoPages(doc, eq, photos);
 
       const fileName = `termo-${(eq.patrimonio || eq.nome || 'equipamento')
         .toString()
