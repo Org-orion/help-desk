@@ -30,7 +30,6 @@ import {
 } from '@/lib/api/equipamentos';
 import { listSetores, createSetor, type Setor as SetorType } from '@/lib/api/setores';
 import { listUsuarios, createUsuario, type Usuario } from '@/lib/api/usuarios';
-import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
 import { supabase } from '@/lib/supabase';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -52,6 +51,7 @@ import {
   validateEquipamentoVinculoLocal,
   type EquipamentoVinculoResumo,
 } from '@/lib/equipment-links';
+import { createEquipmentResponsibilityTermPdf } from '@/lib/equipment-responsibility-term';
 
 type Equipment = EquipamentoType;
 
@@ -67,6 +67,13 @@ const emptyEquipmentForm = () => ({
 });
 
 const safeFilePart = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'equipamento';
+
+const loadTermImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
+  const image = new Image();
+  image.onload = () => resolve(image);
+  image.onerror = () => reject(new Error(`Não foi possível carregar a imagem do termo: ${src}`));
+  image.src = src;
+});
 
 // ── Status Styling ──────────────────────────────────────────────────────────
 
@@ -423,112 +430,11 @@ const Equipamentos = () => {
     try {
       toast.info('Gerando PDF...');
       const eq = selectedEquipment;
-
-      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const marginX = 20;
-      const contentWidth = pageWidth - marginX * 2;
-      let y = 22;
-
-      const dataEmissao = new Date().toLocaleDateString('pt-BR', {
-        day: '2-digit', month: 'long', year: 'numeric',
-      });
-
-      // ── Cabeçalho ──
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.text('TERMO DE RESPONSABILIDADE', pageWidth / 2, y, { align: 'center' });
-      y += 7;
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.setTextColor(110);
-      doc.text('Entrega e uso de equipamento', pageWidth / 2, y, { align: 'center' });
-      doc.setTextColor(0);
-      y += 6;
-      doc.setDrawColor(200);
-      doc.line(marginX, y, pageWidth - marginX, y);
-      y += 12;
-
-      // ── Texto introdutório ──
-      doc.setFontSize(11);
-      const intro =
-        `O presente termo formaliza a entrega do equipamento abaixo descrito ao(à) colaborador(a) ` +
-        `${eq.usuario || 'Não informado'}, do setor ${eq.setor || 'Não informado'}, que declara ` +
-        `recebê-lo em perfeitas condições de uso, comprometendo-se a zelar pela sua conservação e ` +
-        `a utilizá-lo exclusivamente para fins profissionais.`;
-      const introLines = doc.splitTextToSize(intro, contentWidth);
-      doc.text(introLines, marginX, y);
-      y += introLines.length * 6 + 6;
-
-      // ── Tabela de dados do equipamento ──
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12);
-      doc.text('Dados do Equipamento', marginX, y);
-      y += 4;
-      doc.setDrawColor(200);
-      doc.line(marginX, y, pageWidth - marginX, y);
-      y += 8;
-
-      const essenciais = new Set(['Nome / Descrição', 'Tipo', 'Patrimônio', 'Status']);
-      const rows = ([
-        ['Nome / Descrição', eq.nome],
-        ['Tipo', eq.tipo],
-        ['Patrimônio', eq.patrimonio],
-        ['Marca', eq.marca],
-        ['Modelo', eq.modelo],
-        ['Status', eq.status],
-        ['Processador', eq.processador],
-        ['Memória (RAM)', eq.ram],
-        ['Armazenamento', eq.armazenamento],
-      ] as [string, string | undefined][])
-        .filter(([label, value]) => essenciais.has(label) || (value && value.trim()))
-        .map(([label, value]) => [label, value && value.trim() ? value : '—'] as [string, string]);
-
-      doc.setFontSize(10);
-      rows.forEach(([label, value]) => {
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${label}:`, marginX, y);
-        doc.setFont('helvetica', 'normal');
-        const valueLines = doc.splitTextToSize(String(value), contentWidth - 50);
-        doc.text(valueLines, marginX + 50, y);
-        y += valueLines.length * 6 + 1;
-      });
-
-      y += 10;
-
-      // ── Responsável / colaborador ──
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12);
-      doc.text('Responsável', marginX, y);
-      y += 4;
-      doc.line(marginX, y, pageWidth - marginX, y);
-      y += 8;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Colaborador:', marginX, y);
-      doc.setFont('helvetica', 'normal');
-      doc.text(eq.usuario || 'Não informado', marginX + 50, y);
-      y += 7;
-      doc.setFont('helvetica', 'bold');
-      doc.text('Setor:', marginX, y);
-      doc.setFont('helvetica', 'normal');
-      doc.text(eq.setor || 'Não informado', marginX + 50, y);
-      y += 7;
-      doc.setFont('helvetica', 'bold');
-      doc.text('Data de emissão:', marginX, y);
-      doc.setFont('helvetica', 'normal');
-      doc.text(dataEmissao, marginX + 50, y);
-
-      // ── Assinaturas ──
-      const signY = 250;
-      doc.setDrawColor(120);
-      doc.line(marginX, signY, marginX + 70, signY);
-      doc.line(pageWidth - marginX - 70, signY, pageWidth - marginX, signY);
-      doc.setFontSize(9);
-      doc.setTextColor(90);
-      doc.text('Colaborador', marginX + 35, signY + 5, { align: 'center' });
-      doc.text('Responsável (TI)', pageWidth - marginX - 35, signY + 5, { align: 'center' });
-      doc.setTextColor(0);
+      const [logo, watermark] = await Promise.all([
+        loadTermImage('/responsibility-term/logo.png'),
+        loadTermImage('/responsibility-term/watermark.png'),
+      ]);
+      const doc = createEquipmentResponsibilityTermPdf(eq, new Date(), { logo, watermark });
 
       const fileName = `termo-${(eq.patrimonio || eq.nome || 'equipamento')
         .toString()
