@@ -26,8 +26,8 @@ declare equipment_id uuid; now_at timestamptz:=clock_timestamp();
 begin
  if not exists(select 1 from public.app_users where id=p_actor_user_id and tier='admin') then raise exception 'unauthorized'; end if;
  if not exists(select 1 from public.equipment_qr_labels where id=p_label_id and status='UNUSED' for update) then raise exception 'label unavailable'; end if;
- insert into public.equipamentos(nome,tipo,patrimonio,marca,modelo,status,usuario,setor,ram,armazenamento,processador,polegadas,ghz)
- values(p_equipment->>'nome',p_equipment->>'tipo',p_equipment->>'patrimonio',nullif(p_equipment->>'marca',''),nullif(p_equipment->>'modelo',''),p_equipment->>'status',nullif(p_equipment->>'usuario',''),nullif(p_equipment->>'setor',''),nullif(p_equipment->>'ram',''),nullif(p_equipment->>'armazenamento',''),nullif(p_equipment->>'processador',''),nullif(p_equipment->>'polegadas',''),nullif(p_equipment->>'ghz','')) returning id into equipment_id;
+ insert into public.equipamentos(nome,tipo,patrimonio,marca,modelo,mac,status,usuario,setor,ram,armazenamento,processador,polegadas,ghz)
+ values(p_equipment->>'nome',p_equipment->>'tipo',p_equipment->>'patrimonio',nullif(p_equipment->>'marca',''),nullif(p_equipment->>'modelo',''),nullif(p_equipment->>'mac',''),p_equipment->>'status',nullif(p_equipment->>'usuario',''),nullif(p_equipment->>'setor',''),nullif(p_equipment->>'ram',''),nullif(p_equipment->>'armazenamento',''),nullif(p_equipment->>'processador',''),nullif(p_equipment->>'polegadas',''),nullif(p_equipment->>'ghz','')) returning id into equipment_id;
  update public.equipment_qr_labels set status='BOUND',equipment_id=equipment_id,bound_at=now_at,bound_by_user_id=p_actor_user_id,updated_at=now_at where id=p_label_id and status='UNUSED';
  if not found then raise exception 'label conflict'; end if;
  insert into public.equipment_qr_label_audit(label_id,action,actor_user_id,equipment_id) values(p_label_id,'BOUND',p_actor_user_id,equipment_id);

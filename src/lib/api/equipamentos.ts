@@ -10,6 +10,8 @@ export type Equipamento = {
   patrimonio: string
   marca?: string
   modelo?: string
+  /** Endereço MAC (AA:BB:CC:DD:EE:FF). Ausente nos cadastros antigos = pendente. */
+  mac?: string | null
   status: 'Disponível' | 'Em Uso' | 'Manutenção' | 'Inativo'
   usuario?: string
   setor?: string

@@ -460,6 +460,8 @@ O redirect de rota protegida não usa `replace`, enquanto o redirect do login us
 ### Gestão de equipamentos
 
 - Lista → ficha, edição, exclusão, termo PDF ou QR.
+- Cadastro/edição exige endereço MAC válido antes de qualquer gravação, inclusive no cadastro vinculado a etiqueta QR.
+- Filtro "MAC pendente" isola os ativos anteriores à exigência do campo.
 - Cadastro/edição → pesquisa opcional de um equipamento principal elegível → validação local e no banco → confirmação ao trocar ou remover um vínculo.
 - Ficha de equipamento vinculado → equipamento principal clicável; ficha de equipamento principal → quantidade e lista clicável dos vinculados.
 - Scanner de QR `UNUSED` → cadastro de novo equipamento ou vínculo com equipamento existente.
@@ -907,7 +909,9 @@ Mutações críticas são delegadas a RPCs `security definer` transacionais.
 
 ### `Equipamento`
 
-`id`, `nome`, `tipo`, `patrimonio`, `marca?`, `modelo?`, `status`, `usuario?`, `setor?`, `ram?`, `armazenamento?`, `processador?`, `polegadas?`, `ghz?`, `equipamento_pai_id?`, `created_at?`.
+`id`, `nome`, `tipo`, `patrimonio`, `marca?`, `modelo?`, `mac?`, `status`, `usuario?`, `setor?`, `ram?`, `armazenamento?`, `processador?`, `polegadas?`, `ghz?`, `equipamento_pai_id?`, `created_at?`.
+
+O `mac` é obrigatório no formulário de cadastro e de edição, mas aceita nulo no banco: os ativos anteriores à exigência permanecem sem valor e são tratados como **MAC pendente** pela aplicação, que os sinaliza na lista e oferece um filtro dedicado para regularização. É gravado no formato `AA:BB:CC:DD:EE:FF` e não se repete entre ativos. Não é exposto na rota pública de consulta por QR.
 
 `EquipamentoVinculoResumo` contém somente identidade, nome, tipo, patrimônio, status, marca/modelo e `equipamento_pai_id`, evitando modelos recursivos para exibição.
 

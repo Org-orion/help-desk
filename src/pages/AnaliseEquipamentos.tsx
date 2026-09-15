@@ -9,12 +9,13 @@ import {
   Package, Activity, CheckCircle2, Settings2, XCircle,
   Cpu, List,
   FilterX, Hash, User as UserIcon, Building2, HardDrive,
-  ChevronRight, LayoutDashboard, SlidersHorizontal
+  ChevronRight, LayoutDashboard, SlidersHorizontal, Network, AlertTriangle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
 import { MetricCard, PageHeader, EmptyState, SearchInput } from '@/components/shared'
 import { getEquipmentStatusConfig, getEquipmentTypeIcon } from '@/lib/config/equipment'
+import { displayMac, isMacPendente, stripMac } from '@/lib/utils/mac'
 
 // ── Main Component ──────────────────────────────────────────────────────────
 
@@ -48,10 +49,13 @@ const AnaliseEquipamentos = () => {
     
     if (search) {
       const term = search.toLowerCase()
+      const macTerm = stripMac(search)
       rows = rows.filter(e => 
         e.nome.toLowerCase().includes(term) || 
         e.patrimonio.toLowerCase().includes(term) || 
-        (e.usuario ?? '').toLowerCase().includes(term)
+        (e.usuario ?? '').toLowerCase().includes(term) ||
+        (e.mac ?? '').toLowerCase().includes(term) ||
+        (macTerm.length >= 2 && stripMac(e.mac).includes(macTerm))
       )
     }
 
@@ -258,6 +262,17 @@ const AnaliseItem = ({ equipment }: { equipment: Equipamento }) => {
               <Building2 className="w-3.5 h-3.5" />
               <span className="text-sm font-medium">{equipment.setor || 'N/A'}</span>
             </div>
+            {isMacPendente(equipment.mac) ? (
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-widest">
+                <AlertTriangle className="w-3 h-3" />
+                MAC pendente
+              </span>
+            ) : (
+              <div className="flex items-center gap-2 text-slate-500">
+                <Network className="w-3.5 h-3.5" />
+                <span className="text-sm font-mono font-medium">{displayMac(equipment.mac)}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -23,6 +23,7 @@ const REQUIRED_TRIGGERS = [
 const REQUIRED_INDEXES = [
   'idx_app_users_tier',
   'idx_equipamentos_status',
+  'idx_equipamentos_mac',
   'idx_produtos_categoria',
   'idx_produto_saidas_produto_data',
   'idx_chamados_status',
