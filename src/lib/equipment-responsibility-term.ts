@@ -6,6 +6,7 @@ export type ResponsibilityTermEquipment = {
   patrimonio?: string
   marca?: string
   modelo?: string
+  mac?: string | null
   ram?: string
   armazenamento?: string
   processador?: string
@@ -65,6 +66,7 @@ export const buildEquipmentDeliveryDescription = (equipment: ResponsibilityTermE
     appendLabel('tela de', equipment.polegadas),
     appendLabel('frequência de', appendSuffix(equipment.ghz, 'GHz')),
     appendLabel('patrimônio', equipment.patrimonio),
+    appendLabel('MAC', equipment.mac ?? undefined),
   ].filter(Boolean)
 
   if (!details.length && clean(equipment.nome)) {

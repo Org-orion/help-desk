@@ -18,7 +18,8 @@ import {
   MoreHorizontal, Laptop, Monitor, Smartphone, Tablet, Cpu, Package,
   User as UserIcon, Building2, Activity, CheckCircle2, XCircle, Eye,
   LayoutGrid, List, SlidersHorizontal, ChevronRight, Hash, HardDrive, 
-  Settings2, ArrowRight, Upload, Image as ImageIcon, X, Star, QrCode, Download, Link2
+  Settings2, ArrowRight, Upload, Image as ImageIcon, X, Star, QrCode, Download, Link2,
+  Network, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -44,6 +45,7 @@ import { EquipmentQrManageDialog } from '@/components/equipment-qr/EquipmentQrMa
 import { EQUIPMENT_QR_LABELS_UNAVAILABLE_MESSAGE, type EquipmentQrLookupDTO } from '@/lib/equipment-qr-labels';
 import { ConfirmDeleteModal } from '@/components/shared/ConfirmDeleteModal';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { formatMacInput, isValidMac, isMacPendente, normalizeMac, displayMac, stripMac } from '@/lib/utils/mac';
 import {
   getEquipamentoPrincipal,
   listEquipamentosPrincipaisDisponiveis,
@@ -66,7 +68,7 @@ const MAX_IMAGE_SIZE = EQUIPMENT_IMAGE_MAX_SIZE;
 const MAX_IMAGES = 5;
 
 const emptyEquipmentForm = () => ({
-  nome: '', tipo: 'Notebook', patrimonio: '', marca: '', modelo: '',
+  nome: '', tipo: 'Notebook', patrimonio: '', marca: '', modelo: '', mac: '',
   status: 'Disponível' as Equipment['status'], usuario: '', setor: '', ram: '',
   armazenamento: '', processador: '', polegadas: '', ghz: '', equipamento_pai_id: null as string | null,
 });
@@ -181,6 +183,7 @@ const Equipamentos = () => {
   const [activeType, setActiveType] = useState<'all' | 'PC' | 'TAB' | 'CEL' | 'IMP' | 'MON'>('all');
   const [activeStatus, setActiveStatus] = useState<string>('all');
   const [activeSetor, setActiveSetor] = useState<string>('all');
+  const [onlyMacPendente, setOnlyMacPendente] = useState(false);
   
   const [assetSheetOpen, setAssetSheetOpen] = useState(false);
   const [assetSheetMode, setAssetSheetMode] = useState<'create' | 'edit'>('create');
@@ -190,6 +193,7 @@ const Equipamentos = () => {
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
 
   const [formData, setFormData] = useState(emptyEquipmentForm);
+  const [macError, setMacError] = useState('');
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [savedImages, setSavedImages] = useState<EquipamentoImagem[]>([]);
   const [imagesLoading, setImagesLoading] = useState(false);
@@ -279,23 +283,28 @@ const Equipamentos = () => {
 
   const filteredEquipments = useMemo(() => {
     const term = searchTerm.toLowerCase();
+    const macTerm = stripMac(searchTerm);
     let rows = equipamentos.filter(eq =>
       eq.nome.toLowerCase().includes(term) ||
       eq.patrimonio.toLowerCase().includes(term) ||
-      (eq.usuario || '').toLowerCase().includes(term)
+      (eq.usuario || '').toLowerCase().includes(term) ||
+      (eq.mac || '').toLowerCase().includes(term) ||
+      (macTerm.length >= 2 && stripMac(eq.mac).includes(macTerm))
     );
     if (activeType !== 'all') rows = rows.filter(e => getPrefixByEquipment(e) === activeType || (activeType === 'PC' && getPrefixByEquipment(e) === 'JV'));
     if (activeStatus !== 'all') rows = rows.filter(e => e.status === activeStatus);
     if (activeSetor !== 'all') rows = rows.filter(e => (e.setor || '').toUpperCase() === activeSetor);
+    if (onlyMacPendente) rows = rows.filter(e => isMacPendente(e.mac));
     
     return rows.sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [equipamentos, searchTerm, activeType, activeStatus, activeSetor, getPrefixByEquipment]);
+  }, [equipamentos, searchTerm, activeType, activeStatus, activeSetor, onlyMacPendente, getPrefixByEquipment]);
 
   const stats = useMemo(() => ({
     total: equipamentos.length,
     emUso: equipamentos.filter(e => e.status === 'Em Uso').length,
     disponiveis: equipamentos.filter(e => e.status === 'Disponível').length,
     manutencao: equipamentos.filter(e => e.status === 'Manutenção').length,
+    macPendente: equipamentos.filter(e => isMacPendente(e.mac)).length,
   }), [equipamentos]);
 
   const eligibleParentEquipments = useMemo(
@@ -364,12 +373,13 @@ const Equipamentos = () => {
     setSelectedEquipment(e);
     setFormData({
       nome: e.nome, tipo: e.tipo, patrimonio: e.patrimonio,
-      marca: e.marca || '', modelo: e.modelo || '', status: e.status,
+      marca: e.marca || '', modelo: e.modelo || '', mac: e.mac || '', status: e.status,
       usuario: e.usuario || '', setor: (e.setor || '').toUpperCase(),
       ram: e.ram || '', armazenamento: e.armazenamento || '',
       processador: e.processador || '', polegadas: e.polegadas || '', ghz: e.ghz || '',
       equipamento_pai_id: e.equipamento_pai_id || null,
     });
+    setMacError('');
     setAssetSheetMode('edit');
     setAssetSheetOpen(true);
     refreshImages(e.id).catch(() => toast.error('Não foi possível carregar as imagens do equipamento.'));
@@ -392,12 +402,12 @@ const Equipamentos = () => {
     setLinkQrLabel(label);
   };
 
-  const submitQrBoundEquipment = async () => {
+  const submitQrBoundEquipment = async (equipment: typeof formData) => {
     if (!pendingQrLabel || qrSubmitting) return;
-    if (formData.patrimonio !== pendingQrLabel.displayCode && !confirm(`O patrimônio foi alterado de ${pendingQrLabel.displayCode} para ${formData.patrimonio}. Deseja continuar?`)) return;
+    if (equipment.patrimonio !== pendingQrLabel.displayCode && !confirm(`O patrimônio foi alterado de ${pendingQrLabel.displayCode} para ${equipment.patrimonio}. Deseja continuar?`)) return;
     setQrSubmitting(true);
     try {
-      const { error } = await supabase.functions.invoke('equipment-qr-admin', { body: { action: 'bind-new', labelId: pendingQrLabel.id, equipment: formData } });
+      const { error } = await supabase.functions.invoke('equipment-qr-admin', { body: { action: 'bind-new', labelId: pendingQrLabel.id, equipment } });
       if (error) toast.error('Não foi possível cadastrar e vincular o equipamento.');
       else {
         setPendingQrLabel(null);
@@ -413,6 +423,14 @@ const Equipamentos = () => {
   };
 
   const submitEquipmentForm = () => {
+    if (!isValidMac(formData.mac)) {
+      setMacError('Informe o MAC completo (12 dígitos hexadecimais).');
+      toast.error('O endereço MAC é obrigatório.');
+      return;
+    }
+    setMacError('');
+    const payload = { ...formData, mac: normalizeMac(formData.mac) };
+
     const equipmentId = assetSheetMode === 'edit' ? selectedEquipment?.id : undefined;
     const validationError = validateEquipamentoVinculoLocal(
       equipmentId,
@@ -425,15 +443,15 @@ const Equipamentos = () => {
     }
 
     if (assetSheetMode === 'create') {
-      if (pendingQrLabel) void submitQrBoundEquipment();
-      else createMut.mutate(formData);
+      if (pendingQrLabel) void submitQrBoundEquipment(payload);
+      else createMut.mutate(payload);
       return;
     }
     if (!selectedEquipment) return;
 
     const currentParentId = selectedEquipment.equipamento_pai_id ?? null;
-    const nextParentId = formData.equipamento_pai_id ?? null;
-    const update = { id: selectedEquipment.id, input: formData as Partial<Equipment> };
+    const nextParentId = payload.equipamento_pai_id ?? null;
+    const update = { id: selectedEquipment.id, input: payload as Partial<Equipment> };
     if (currentParentId !== nextParentId) {
       setPendingEquipmentUpdate(update);
       return;
@@ -644,11 +662,31 @@ const Equipamentos = () => {
             </SelectContent>
           </Select>
 
-          {(searchTerm || activeType !== 'all' || activeStatus !== 'all' || activeSetor !== 'all') && (
+          <button
+            type="button"
+            onClick={() => setOnlyMacPendente(v => !v)}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg border text-xs font-bold uppercase tracking-wider transition-all",
+              onlyMacPendente
+                ? "bg-amber-500 text-white border-amber-500 shadow-sm"
+                : "bg-white text-amber-600 border-amber-200 hover:bg-amber-50"
+            )}
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            MAC pendente
+            <span className={cn(
+              "px-1.5 py-0.5 rounded-md text-[10px] font-black",
+              onlyMacPendente ? "bg-white/20" : "bg-amber-100"
+            )}>
+              {stats.macPendente}
+            </span>
+          </button>
+
+          {(searchTerm || activeType !== 'all' || activeStatus !== 'all' || activeSetor !== 'all' || onlyMacPendente) && (
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => { setSearchTerm(''); setActiveType('all'); setActiveStatus('all'); setActiveSetor('all'); }}
+              onClick={() => { setSearchTerm(''); setActiveType('all'); setActiveStatus('all'); setActiveSetor('all'); setOnlyMacPendente(false); }}
               className="text-xs font-bold text-red-500 hover:text-red-600 hover:bg-red-50 uppercase tracking-wider px-3"
             >
               Limpar Filtros
@@ -794,6 +832,45 @@ const Equipamentos = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="mac" className="flex items-center gap-2">
+                    <Network className="w-3.5 h-3.5 text-slate-400" />
+                    Endereço MAC
+                    <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="mac"
+                    value={formData.mac}
+                    onChange={(e) => {
+                      setFormData({ ...formData, mac: formatMacInput(e.target.value) });
+                      if (macError) setMacError('');
+                    }}
+                    required
+                    autoComplete="off"
+                    maxLength={17}
+                    aria-invalid={Boolean(macError)}
+                    className={cn(
+                      'bg-slate-50 dark:bg-slate-900/50 font-mono uppercase tracking-wider',
+                      macError && 'border-red-400 focus-visible:ring-red-400'
+                    )}
+                    placeholder="AA:BB:CC:DD:EE:FF"
+                  />
+                  {macError ? (
+                    <p className="text-xs font-semibold text-red-500">{macError}</p>
+                  ) : (
+                    <p className="text-[11px] text-slate-400">
+                      Campo obrigatório. Aceita digitação com ou sem separadores.
+                    </p>
+                  )}
+                  {assetSheetMode === 'edit' && isMacPendente(selectedEquipment?.mac) && (
+                    <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30">
+                      <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                      <p className="text-xs font-medium">
+                        Cadastro anterior à exigência do MAC. Informe o endereço para regularizar o ativo.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -967,13 +1044,17 @@ const Equipamentos = () => {
                     { label: 'Modelo', value: selectedEquipment.modelo || '—', icon: Settings2 },
                     { label: 'Setor', value: selectedEquipment.setor || '—', icon: Building2 },
                     { label: 'Responsável', value: selectedEquipment.usuario || '—', icon: UserIcon },
+                    { label: 'Endereço MAC', value: displayMac(selectedEquipment.mac), icon: Network },
                   ].map(({ label, value, icon: Icon }) => (
                     <div key={label}>
                       <div className="flex items-center gap-1.5 mb-1 text-slate-400">
                         <Icon className="w-3.5 h-3.5" />
                         <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
                       </div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white">{value}</p>
+                      <p className={cn(
+                        "text-sm font-semibold text-slate-900 dark:text-white",
+                        label === 'Endereço MAC' && (isMacPendente(selectedEquipment.mac) ? 'text-amber-600 dark:text-amber-400' : 'font-mono')
+                      )}>{value}</p>
                     </div>
                   ))}
                 </div>
@@ -1341,6 +1422,17 @@ const EquipmentItem = ({ equipment, parentEquipment, onView, onEdit, onDelete, o
               <Building2 className="w-3.5 h-3.5" />
               <span className="text-sm font-medium">{equipment.setor || 'N/A'}</span>
             </div>
+            {isMacPendente(equipment.mac) ? (
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-widest">
+                <AlertTriangle className="w-3 h-3" />
+                MAC pendente
+              </span>
+            ) : (
+              <div className="flex items-center gap-2 text-slate-500">
+                <Network className="w-3.5 h-3.5" />
+                <span className="text-sm font-mono font-medium">{displayMac(equipment.mac)}</span>
+              </div>
+            )}
             {parentEquipment && (
               <div className="flex items-center gap-2 text-primary/80">
                 <Link2 className="h-3.5 w-3.5" />
