@@ -1,4 +1,5 @@
 import { supabase } from '../supabase'
+import { equipamentoError } from '../equipment-errors'
 import { EQUIPMENT_IMAGES_BUCKET, EQUIPMENT_IMAGE_MAX_SIZE, validateEquipmentImage } from '../equipment-images'
 
 export { EQUIPMENT_IMAGE_MAX_SIZE } from '../equipment-images'
@@ -126,15 +127,6 @@ export async function validateEquipamentoVinculo(
   }
 }
 
-function equipmentLinkError(error: { message?: string }): Error {
-  const message = String(error?.message ?? '')
-  if (message.includes('EQUIPMENT_LINK_SELF')) return new Error('Um equipamento não pode ser vinculado a ele mesmo.')
-  if (message.includes('EQUIPMENT_LINK_PARENT_NOT_FOUND')) return new Error('O equipamento principal selecionado não foi encontrado.')
-  if (message.includes('EQUIPMENT_LINK_PARENT_IS_LINKED')) return new Error('Um equipamento vinculado não pode ser selecionado como equipamento principal.')
-  if (message.includes('EQUIPMENT_LINK_CHILD_HAS_LINKS')) return new Error('Um equipamento que possui vinculados não pode ser vinculado a outro equipamento.')
-  return error instanceof Error ? error : new Error(message || 'Não foi possível salvar o vínculo entre equipamentos.')
-}
-
 export async function createEquipamento(input: Omit<Equipamento, 'id' | 'created_at'>): Promise<Equipamento> {
   await validateEquipamentoVinculo(undefined, input.equipamento_pai_id)
   const { data, error } = await supabase
@@ -142,7 +134,7 @@ export async function createEquipamento(input: Omit<Equipamento, 'id' | 'created
     .insert(input)
     .select('*')
     .single()
-  if (error) throw equipmentLinkError(error)
+  if (error) throw equipamentoError(error, 'Não foi possível registrar o equipamento.')
   return data as Equipamento
 }
 
@@ -156,7 +148,7 @@ export async function updateEquipamento(id: string, input: Partial<Omit<Equipame
     .eq('id', id)
     .select('*')
     .single()
-  if (error) throw equipmentLinkError(error)
+  if (error) throw equipamentoError(error, 'Não foi possível atualizar o equipamento.')
   return data as Equipamento
 }
 
@@ -165,5 +157,5 @@ export async function deleteEquipamento(id: string): Promise<void> {
     .from('equipamentos')
     .delete()
     .eq('id', id)
-  if (error) throw error
+  if (error) throw equipamentoError(error, 'Não foi possível excluir este ativo.')
 }
