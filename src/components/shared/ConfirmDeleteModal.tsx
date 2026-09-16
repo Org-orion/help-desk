@@ -43,8 +43,12 @@ export function ConfirmDeleteModal({
     try {
       await onConfirm()
       onOpenChange(false)
-    } catch {
-      setError('Não foi possível excluir este ativo. Tente novamente.')
+    } catch (deleteError) {
+      // A causa costuma ser uma restrição do banco (etiqueta QR, vínculos).
+      // Repetir a ação não resolve, então mostramos o motivo real.
+      setError(deleteError instanceof Error && deleteError.message
+        ? deleteError.message
+        : 'Não foi possível excluir este ativo. Tente novamente.')
     } finally {
       submittingRef.current = false
       setSubmitting(false)

@@ -532,6 +532,24 @@ const Equipamentos = () => {
     link.click();
   };
 
+  /**
+   * Abre a ficha de cadastro sempre em branco. Sem este reset o formulário
+   * reaproveitava os dados do último ativo aberto para edição, e o cadastro
+   * falhava no patrimônio duplicado.
+   */
+  const handleCreateAsset = () => {
+    pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+    setPendingImages([]);
+    setSavedImages([]);
+    setImageError('');
+    setMacError('');
+    setSelectedEquipment(null);
+    setPendingQrLabel(null);
+    setFormData(emptyEquipmentForm());
+    setAssetSheetMode('create');
+    setAssetSheetOpen(true);
+  };
+
   const registerAnother = () => {
     pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
     setPendingImages([]);
@@ -557,7 +575,7 @@ const Equipamentos = () => {
           <Button type="button" variant="outline" onClick={() => setQrScannerOpen(true)} className="h-12 rounded-xl"><QrCode className="h-5 w-5" />Escanear etiqueta QR</Button>
           <Button type="button" variant="outline" onClick={() => setQrBatchOpen(true)} className="h-12 rounded-xl"><Printer className="h-5 w-5" />Gerar etiquetas QR</Button>
           <Button
-            onClick={() => { setPendingQrLabel(null); setFormData({ ...formData, equipamento_pai_id: null }); setAssetSheetMode('create'); setAssetSheetOpen(true); }}
+            onClick={handleCreateAsset}
             className="h-12 px-6 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             <Plus className="w-5 h-5 mr-2" />
