@@ -45,6 +45,7 @@ import { EquipmentQrManageDialog } from '@/components/equipment-qr/EquipmentQrMa
 import { EQUIPMENT_QR_LABELS_UNAVAILABLE_MESSAGE, type EquipmentQrLookupDTO } from '@/lib/equipment-qr-labels';
 import { ConfirmDeleteModal } from '@/components/shared/ConfirmDeleteModal';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatMacInput, isValidMac, isMacPendente, normalizeMac, displayMac, stripMac } from '@/lib/utils/mac';
 import {
   getEquipamentoPrincipal,
@@ -140,6 +141,8 @@ const getTypeIcon = (tipo: string): any => {
 
 const Equipamentos = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const podeExcluirAtivos = user?.podeExcluirAtivos === true;
   const [searchParams] = useSearchParams();
   useResponsive();
 
@@ -357,7 +360,7 @@ const Equipamentos = () => {
   });
 
   const deleteMut = useMutation({
-    mutationFn: deleteEquipamento,
+    mutationFn: (id: string) => deleteEquipamento(id, user?.id ?? ''),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipamentos'] });
       toast.success('Equipamento removido');
@@ -748,10 +751,10 @@ const Equipamentos = () => {
                 parentEquipment={getEquipamentoPrincipal(eq, equipamentos)}
                 onView={() => openEquipmentDetails(eq)}
                 onEdit={() => handleEdit(eq)}
-                onDelete={(trigger: HTMLElement | null) => {
+                onDelete={podeExcluirAtivos ? (trigger: HTMLElement | null) => {
                   deleteMenuTriggerRef.current = trigger;
                   setEquipmentToDelete(eq);
-                }}
+                } : undefined}
                 onPrint={() => { setSelectedEquipment(eq); setTermDialogOpen(true); }}
                 onQrCode={() => handleGenerateQrCode(eq)}
               />
@@ -1497,11 +1500,15 @@ const EquipmentItem = ({ equipment, parentEquipment, onView, onEdit, onDelete, o
                 <QrCode className="w-4 h-4 mr-3 text-slate-400" />
                 <span className="font-bold text-slate-700">Gerar QR Code</span>
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="my-2" />
-              <DropdownMenuItem onSelect={() => onDelete(menuTriggerRef.current)} className="rounded-xl py-3 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50">
-                <Trash2 className="w-4 h-4 mr-3" />
-                <span className="font-bold">Excluir Ativo</span>
-              </DropdownMenuItem>
+              {onDelete && (
+                <>
+                  <DropdownMenuSeparator className="my-2" />
+                  <DropdownMenuItem onSelect={() => onDelete(menuTriggerRef.current)} className="rounded-xl py-3 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50">
+                    <Trash2 className="w-4 h-4 mr-3" />
+                    <span className="font-bold">Excluir Ativo</span>
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

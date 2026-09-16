@@ -152,10 +152,15 @@ export async function updateEquipamento(id: string, input: Partial<Omit<Equipame
   return data as Equipamento
 }
 
-export async function deleteEquipamento(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('equipamentos')
-    .delete()
-    .eq('id', id)
+/**
+ * A exclusão passa por uma função `security definer`: o cliente não tem mais
+ * `delete` na tabela, e a permissão é conferida no servidor. É ela também que
+ * solta as etiquetas QR, que bloqueiam o delete com `on delete restrict`.
+ */
+export async function deleteEquipamento(id: string, actorUserId: string): Promise<void> {
+  const { error } = await supabase.rpc('excluir_equipamento', {
+    p_equipment_id: id,
+    p_actor_user_id: actorUserId,
+  })
   if (error) throw equipamentoError(error, 'Não foi possível excluir este ativo.')
 }
