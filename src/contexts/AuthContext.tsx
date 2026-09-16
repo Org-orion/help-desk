@@ -2,15 +2,15 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { supabase } from '@/lib/supabase'
 import { LOGO_MINI_SRC } from '@/config/branding'
 
-interface User { id:string; email:string; name:string; role:'admin'|'user'; tier:'vip'|'padrao' }
+interface User { id:string; email:string; name:string; role:'admin'|'user'; tier:'vip'|'padrao'; podeExcluirAtivos:boolean }
 export type LoginResult='ok'|'invalid'|'upgrade_required'|'rate_limited'|'unavailable'
 interface AuthContextType { user:User|null; login:(username:string,password:string,newPassword?:string)=>Promise<LoginResult>; logout:()=>Promise<void>; register:(email:string,password:string,name:string)=>Promise<boolean>; isAuthenticated:boolean; loading:boolean }
 const AuthContext=createContext<AuthContextType|undefined>(undefined)
 
 async function loadProfile(authUserId:string):Promise<User|null>{
   if(!supabase)return null
-  const {data,error}=await supabase.from('app_users').select('id,username,name,tier').eq('auth_user_id',authUserId).single();if(error||!data)return null
-  return {id:data.id,email:data.username,name:data.name,role:data.tier==='admin'?'admin':'user',tier:data.tier==='vip'||data.tier==='admin'?'vip':'padrao'}
+  const {data,error}=await supabase.from('app_users').select('id,username,name,tier,pode_excluir_ativos').eq('auth_user_id',authUserId).single();if(error||!data)return null
+  return {id:data.id,email:data.username,name:data.name,role:data.tier==='admin'?'admin':'user',tier:data.tier==='vip'||data.tier==='admin'?'vip':'padrao',podeExcluirAtivos:data.pode_excluir_ativos===true}
 }
 
 export function AuthProvider({children}:{children:ReactNode}){

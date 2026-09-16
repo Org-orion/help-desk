@@ -15,6 +15,12 @@ export function equipamentoError(
   if (message.includes('EQUIPMENT_LINK_PARENT_IS_LINKED')) return new Error('Um equipamento vinculado não pode ser selecionado como equipamento principal.')
   if (message.includes('EQUIPMENT_LINK_CHILD_HAS_LINKS')) return new Error('Um equipamento que possui vinculados não pode ser vinculado a outro equipamento.')
 
+  if (message.includes('EQUIPMENT_DELETE_FORBIDDEN')) {
+    return new Error('Seu usuário não tem permissão para excluir ativos.')
+  }
+  if (message.includes('EQUIPMENT_DELETE_NOT_FOUND')) {
+    return new Error('Este ativo não foi encontrado. Ele pode já ter sido excluído.')
+  }
   if (haystack.includes('equipamentos_patrimonio_key')) {
     return new Error('Já existe um ativo com esse patrimônio. Verifique o código informado.')
   }
