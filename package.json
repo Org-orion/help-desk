@@ -13,6 +13,7 @@
     "test:equipment-mac": "node --experimental-strip-types --test tests/equipment-mac.test.mjs",
     "test:equipment-errors": "node --experimental-strip-types --test tests/equipment-save-errors.test.mjs",
     "test:equipment-delete": "node --experimental-strip-types --test tests/equipment-delete-permission.test.mjs",
+    "test:auth-profile": "node --experimental-strip-types --test tests/auth-profile-fallback.test.mjs",
     "db:apply": "node scripts/apply-supabase-schema.mjs",
     "db:verify": "node scripts/verify-supabase-schema.mjs",
     "db:verify:http": "node scripts/verify-supabase-tables.mjs",
