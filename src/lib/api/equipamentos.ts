@@ -11,8 +11,12 @@ export type Equipamento = {
   patrimonio: string
   marca?: string
   modelo?: string
-  /** Endereço MAC (AA:BB:CC:DD:EE:FF). Ausente nos cadastros antigos = pendente. */
-  mac?: string | null
+  /** MAC do adaptador de rede sem fio Wi-Fi. Opcional; ausente = pendente. */
+  mac_wifi?: string | null
+  /** MAC do adaptador Ethernet. Opcional; ausente = pendente. */
+  mac_ethernet?: string | null
+  /** UUID do dispositivo. Opcional; ausente = pendente. */
+  uuid_dispositivo?: string | null
   status: 'Disponível' | 'Em Uso' | 'Manutenção' | 'Inativo'
   usuario?: string
   setor?: string

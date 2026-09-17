@@ -460,8 +460,8 @@ O redirect de rota protegida não usa `replace`, enquanto o redirect do login us
 ### Gestão de equipamentos
 
 - Lista → ficha, edição, exclusão, termo PDF ou QR.
-- Cadastro/edição exige endereço MAC válido antes de qualquer gravação, inclusive no cadastro vinculado a etiqueta QR.
-- Filtro "MAC pendente" isola os ativos anteriores à exigência do campo.
+- Cadastro/edição aceita os identificadores de rede em branco, mas recusa valor incompleto — inclusive no cadastro vinculado a etiqueta QR.
+- Filtro "Identificação pendente" isola os ativos que ainda não têm algum dos três identificadores.
 - Cadastro/edição → pesquisa opcional de um equipamento principal elegível → validação local e no banco → confirmação ao trocar ou remover um vínculo.
 - Ficha de equipamento vinculado → equipamento principal clicável; ficha de equipamento principal → quantidade e lista clicável dos vinculados.
 - Scanner de QR `UNUSED` → cadastro de novo equipamento ou vínculo com equipamento existente.
@@ -909,9 +909,11 @@ Mutações críticas são delegadas a RPCs `security definer` transacionais.
 
 ### `Equipamento`
 
-`id`, `nome`, `tipo`, `patrimonio`, `marca?`, `modelo?`, `mac?`, `status`, `usuario?`, `setor?`, `ram?`, `armazenamento?`, `processador?`, `polegadas?`, `ghz?`, `equipamento_pai_id?`, `created_at?`.
+`id`, `nome`, `tipo`, `patrimonio`, `marca?`, `modelo?`, `mac_wifi?`, `mac_ethernet?`, `uuid_dispositivo?`, `status`, `usuario?`, `setor?`, `ram?`, `armazenamento?`, `processador?`, `polegadas?`, `ghz?`, `equipamento_pai_id?`, `created_at?`.
 
-O `mac` é obrigatório no formulário de cadastro e de edição, mas aceita nulo no banco: os ativos anteriores à exigência permanecem sem valor e são tratados como **MAC pendente** pela aplicação, que os sinaliza na lista e oferece um filtro dedicado para regularização. É gravado no formato `AA:BB:CC:DD:EE:FF` e não se repete entre ativos. Não é exposto na rota pública de consulta por QR.
+Os três identificadores de rede são **opcionais**: `mac_wifi` (adaptador de rede sem fio Wi-Fi), `mac_ethernet` (adaptador Ethernet) e `uuid_dispositivo`. Nenhum bloqueia o cadastro — o que ficar em branco aparece como **Pendente** na ficha e faz o ativo entrar no filtro "Identificação pendente", que mostra a contagem do que falta levantar. Um valor pela metade, porém, é recusado: ou está completo, ou está vazio.
+
+Os MACs são gravados como `AA:BB:CC:DD:EE:FF` e o UUID no padrão `8-4-4-4-12`. Cada um tem índice único parcial, que ignora os pendentes, então o mesmo endereço não se repete entre ativos. O formulário grava `NULL` — e não string vazia — para que os pendentes não colidam entre si. Nenhum deles é exposto na rota pública de consulta por QR.
 
 `EquipamentoVinculoResumo` contém somente identidade, nome, tipo, patrimônio, status, marca/modelo e `equipamento_pai_id`, evitando modelos recursivos para exibição.
 

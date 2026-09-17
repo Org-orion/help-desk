@@ -47,6 +47,8 @@ import { ConfirmDeleteModal } from '@/components/shared/ConfirmDeleteModal';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatMacInput, isValidMac, isMacPendente, normalizeMac, displayMac, stripMac } from '@/lib/utils/mac';
+import { formatUuidInput, isValidUuid, isUuidPendente, normalizeUuid, displayUuid, stripUuid } from '@/lib/utils/uuid';
+import { listarIdentificadoresPendentes, temIdentificadorPendente } from '@/lib/equipment-identifiers';
 import {
   getEquipamentoPrincipal,
   listEquipamentosPrincipaisDisponiveis,
@@ -69,7 +71,8 @@ const MAX_IMAGE_SIZE = EQUIPMENT_IMAGE_MAX_SIZE;
 const MAX_IMAGES = 5;
 
 const emptyEquipmentForm = () => ({
-  nome: '', tipo: 'Notebook', patrimonio: '', marca: '', modelo: '', mac: '',
+  nome: '', tipo: 'Notebook', patrimonio: '', marca: '', modelo: '',
+  mac_wifi: '', mac_ethernet: '', uuid_dispositivo: '',
   status: 'Disponível' as Equipment['status'], usuario: '', setor: '', ram: '',
   armazenamento: '', processador: '', polegadas: '', ghz: '', equipamento_pai_id: null as string | null,
 });
@@ -186,7 +189,7 @@ const Equipamentos = () => {
   const [activeType, setActiveType] = useState<'all' | 'PC' | 'TAB' | 'CEL' | 'IMP' | 'MON'>('all');
   const [activeStatus, setActiveStatus] = useState<string>('all');
   const [activeSetor, setActiveSetor] = useState<string>('all');
-  const [onlyMacPendente, setOnlyMacPendente] = useState(false);
+  const [onlyPendente, setOnlyPendente] = useState(false);
   
   const [assetSheetOpen, setAssetSheetOpen] = useState(false);
   const [assetSheetMode, setAssetSheetMode] = useState<'create' | 'edit'>('create');
@@ -196,7 +199,7 @@ const Equipamentos = () => {
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
 
   const [formData, setFormData] = useState(emptyEquipmentForm);
-  const [macError, setMacError] = useState('');
+  const [identifierErrors, setIdentifierErrors] = useState<Record<string, string>>({});
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [savedImages, setSavedImages] = useState<EquipamentoImagem[]>([]);
   const [imagesLoading, setImagesLoading] = useState(false);
@@ -287,27 +290,28 @@ const Equipamentos = () => {
   const filteredEquipments = useMemo(() => {
     const term = searchTerm.toLowerCase();
     const macTerm = stripMac(searchTerm);
+    const uuidTerm = stripUuid(searchTerm);
     let rows = equipamentos.filter(eq =>
       eq.nome.toLowerCase().includes(term) ||
       eq.patrimonio.toLowerCase().includes(term) ||
       (eq.usuario || '').toLowerCase().includes(term) ||
-      (eq.mac || '').toLowerCase().includes(term) ||
-      (macTerm.length >= 2 && stripMac(eq.mac).includes(macTerm))
+      (macTerm.length >= 2 && (stripMac(eq.mac_wifi).includes(macTerm) || stripMac(eq.mac_ethernet).includes(macTerm))) ||
+      (uuidTerm.length >= 2 && stripUuid(eq.uuid_dispositivo).includes(uuidTerm))
     );
     if (activeType !== 'all') rows = rows.filter(e => getPrefixByEquipment(e) === activeType || (activeType === 'PC' && getPrefixByEquipment(e) === 'JV'));
     if (activeStatus !== 'all') rows = rows.filter(e => e.status === activeStatus);
     if (activeSetor !== 'all') rows = rows.filter(e => (e.setor || '').toUpperCase() === activeSetor);
-    if (onlyMacPendente) rows = rows.filter(e => isMacPendente(e.mac));
+    if (onlyPendente) rows = rows.filter(temIdentificadorPendente);
     
     return rows.sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [equipamentos, searchTerm, activeType, activeStatus, activeSetor, onlyMacPendente, getPrefixByEquipment]);
+  }, [equipamentos, searchTerm, activeType, activeStatus, activeSetor, onlyPendente, getPrefixByEquipment]);
 
   const stats = useMemo(() => ({
     total: equipamentos.length,
     emUso: equipamentos.filter(e => e.status === 'Em Uso').length,
     disponiveis: equipamentos.filter(e => e.status === 'Disponível').length,
     manutencao: equipamentos.filter(e => e.status === 'Manutenção').length,
-    macPendente: equipamentos.filter(e => isMacPendente(e.mac)).length,
+    pendentes: equipamentos.filter(temIdentificadorPendente).length,
   }), [equipamentos]);
 
   const eligibleParentEquipments = useMemo(
@@ -376,13 +380,14 @@ const Equipamentos = () => {
     setSelectedEquipment(e);
     setFormData({
       nome: e.nome, tipo: e.tipo, patrimonio: e.patrimonio,
-      marca: e.marca || '', modelo: e.modelo || '', mac: e.mac || '', status: e.status,
+      marca: e.marca || '', modelo: e.modelo || '', status: e.status,
+      mac_wifi: e.mac_wifi || '', mac_ethernet: e.mac_ethernet || '', uuid_dispositivo: e.uuid_dispositivo || '',
       usuario: e.usuario || '', setor: (e.setor || '').toUpperCase(),
       ram: e.ram || '', armazenamento: e.armazenamento || '',
       processador: e.processador || '', polegadas: e.polegadas || '', ghz: e.ghz || '',
       equipamento_pai_id: e.equipamento_pai_id || null,
     });
-    setMacError('');
+    setIdentifierErrors({});
     setAssetSheetMode('edit');
     setAssetSheetOpen(true);
     refreshImages(e.id).catch(() => toast.error('Não foi possível carregar as imagens do equipamento.'));
@@ -426,13 +431,26 @@ const Equipamentos = () => {
   };
 
   const submitEquipmentForm = () => {
-    if (!isValidMac(formData.mac)) {
-      setMacError('Informe o MAC completo (12 dígitos hexadecimais).');
-      toast.error('O endereço MAC é obrigatório.');
+    // Os identificadores são opcionais — vazio vira pendência. Mas um valor
+    // pela metade é engano de digitação, e gravá-lo seria pior que recusá-lo.
+    const errors: Record<string, string> = {};
+    if (formData.mac_wifi.trim() && !isValidMac(formData.mac_wifi)) errors.mac_wifi = 'MAC incompleto: são 12 dígitos hexadecimais.';
+    if (formData.mac_ethernet.trim() && !isValidMac(formData.mac_ethernet)) errors.mac_ethernet = 'MAC incompleto: são 12 dígitos hexadecimais.';
+    if (formData.uuid_dispositivo.trim() && !isValidUuid(formData.uuid_dispositivo)) errors.uuid_dispositivo = 'UUID incompleto: são 32 dígitos hexadecimais.';
+    if (Object.keys(errors).length) {
+      setIdentifierErrors(errors);
+      toast.error('Confira os identificadores de rede informados.');
       return;
     }
-    setMacError('');
-    const payload = { ...formData, mac: normalizeMac(formData.mac) };
+    setIdentifierErrors({});
+    // Vazio precisa virar NULL, e não '': os índices únicos ignoram NULL, mas
+    // duas strings vazias colidiriam entre si.
+    const payload = {
+      ...formData,
+      mac_wifi: normalizeMac(formData.mac_wifi) || null,
+      mac_ethernet: normalizeMac(formData.mac_ethernet) || null,
+      uuid_dispositivo: normalizeUuid(formData.uuid_dispositivo) || null,
+    };
 
     const equipmentId = assetSheetMode === 'edit' ? selectedEquipment?.id : undefined;
     const validationError = validateEquipamentoVinculoLocal(
@@ -545,7 +563,7 @@ const Equipamentos = () => {
     setPendingImages([]);
     setSavedImages([]);
     setImageError('');
-    setMacError('');
+    setIdentifierErrors({});
     setSelectedEquipment(null);
     setPendingQrLabel(null);
     setFormData(emptyEquipmentForm());
@@ -685,29 +703,29 @@ const Equipamentos = () => {
 
           <button
             type="button"
-            onClick={() => setOnlyMacPendente(v => !v)}
+            onClick={() => setOnlyPendente(v => !v)}
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-lg border text-xs font-bold uppercase tracking-wider transition-all",
-              onlyMacPendente
+              onlyPendente
                 ? "bg-amber-500 text-white border-amber-500 shadow-sm"
                 : "bg-white text-amber-600 border-amber-200 hover:bg-amber-50"
             )}
           >
             <AlertTriangle className="w-3.5 h-3.5" />
-            MAC pendente
+            Identificação pendente
             <span className={cn(
               "px-1.5 py-0.5 rounded-md text-[10px] font-black",
-              onlyMacPendente ? "bg-white/20" : "bg-amber-100"
+              onlyPendente ? "bg-white/20" : "bg-amber-100"
             )}>
-              {stats.macPendente}
+              {stats.pendentes}
             </span>
           </button>
 
-          {(searchTerm || activeType !== 'all' || activeStatus !== 'all' || activeSetor !== 'all' || onlyMacPendente) && (
+          {(searchTerm || activeType !== 'all' || activeStatus !== 'all' || activeSetor !== 'all' || onlyPendente) && (
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => { setSearchTerm(''); setActiveType('all'); setActiveStatus('all'); setActiveSetor('all'); setOnlyMacPendente(false); }}
+              onClick={() => { setSearchTerm(''); setActiveType('all'); setActiveStatus('all'); setActiveSetor('all'); setOnlyPendente(false); }}
               className="text-xs font-bold text-red-500 hover:text-red-600 hover:bg-red-50 uppercase tracking-wider px-3"
             >
               Limpar Filtros
@@ -854,44 +872,53 @@ const Equipamentos = () => {
                     </Select>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="mac" className="flex items-center gap-2">
+                <div className="space-y-4 rounded-xl border border-slate-200 dark:border-emerald-900/30 p-4">
+                  <div className="flex items-center gap-2">
                     <Network className="w-3.5 h-3.5 text-slate-400" />
-                    Endereço MAC
-                    <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="mac"
-                    value={formData.mac}
-                    onChange={(e) => {
-                      setFormData({ ...formData, mac: formatMacInput(e.target.value) });
-                      if (macError) setMacError('');
-                    }}
-                    required
-                    autoComplete="off"
-                    maxLength={17}
-                    aria-invalid={Boolean(macError)}
-                    className={cn(
-                      'bg-slate-50 dark:bg-slate-900/50 font-mono uppercase tracking-wider',
-                      macError && 'border-red-400 focus-visible:ring-red-400'
-                    )}
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Identificadores de Rede</p>
+                  </div>
+                  <p className="text-[11px] text-slate-400 -mt-2">
+                    Todos opcionais. O que ficar em branco aparece como pendente na listagem.
+                  </p>
+
+                  <IdentifierField
+                    id="mac_wifi"
+                    label="MAC — Adaptador de Rede sem Fio Wi-Fi"
+                    value={formData.mac_wifi}
+                    error={identifierErrors.mac_wifi}
                     placeholder="AA:BB:CC:DD:EE:FF"
+                    maxLength={17}
+                    onChange={(value) => {
+                      setFormData({ ...formData, mac_wifi: formatMacInput(value) });
+                      if (identifierErrors.mac_wifi) setIdentifierErrors({ ...identifierErrors, mac_wifi: '' });
+                    }}
                   />
-                  {macError ? (
-                    <p className="text-xs font-semibold text-red-500">{macError}</p>
-                  ) : (
-                    <p className="text-[11px] text-slate-400">
-                      Campo obrigatório. Aceita digitação com ou sem separadores.
-                    </p>
-                  )}
-                  {assetSheetMode === 'edit' && isMacPendente(selectedEquipment?.mac) && (
-                    <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30">
-                      <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                      <p className="text-xs font-medium">
-                        Cadastro anterior à exigência do MAC. Informe o endereço para regularizar o ativo.
-                      </p>
-                    </div>
-                  )}
+
+                  <IdentifierField
+                    id="mac_ethernet"
+                    label="MAC — Adaptador Ethernet"
+                    value={formData.mac_ethernet}
+                    error={identifierErrors.mac_ethernet}
+                    placeholder="AA:BB:CC:DD:EE:FF"
+                    maxLength={17}
+                    onChange={(value) => {
+                      setFormData({ ...formData, mac_ethernet: formatMacInput(value) });
+                      if (identifierErrors.mac_ethernet) setIdentifierErrors({ ...identifierErrors, mac_ethernet: '' });
+                    }}
+                  />
+
+                  <IdentifierField
+                    id="uuid_dispositivo"
+                    label="UUID do dispositivo"
+                    value={formData.uuid_dispositivo}
+                    error={identifierErrors.uuid_dispositivo}
+                    placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+                    maxLength={36}
+                    onChange={(value) => {
+                      setFormData({ ...formData, uuid_dispositivo: formatUuidInput(value) });
+                      if (identifierErrors.uuid_dispositivo) setIdentifierErrors({ ...identifierErrors, uuid_dispositivo: '' });
+                    }}
+                  />
                 </div>
               </div>
 
@@ -1065,7 +1092,9 @@ const Equipamentos = () => {
                     { label: 'Modelo', value: selectedEquipment.modelo || '—', icon: Settings2 },
                     { label: 'Setor', value: selectedEquipment.setor || '—', icon: Building2 },
                     { label: 'Responsável', value: selectedEquipment.usuario || '—', icon: UserIcon },
-                    { label: 'Endereço MAC', value: displayMac(selectedEquipment.mac), icon: Network },
+                    { label: 'MAC Wi-Fi', value: displayMac(selectedEquipment.mac_wifi), icon: Network },
+                    { label: 'MAC Ethernet', value: displayMac(selectedEquipment.mac_ethernet), icon: Network },
+                    { label: 'UUID', value: displayUuid(selectedEquipment.uuid_dispositivo), icon: Hash },
                   ].map(({ label, value, icon: Icon }) => (
                     <div key={label}>
                       <div className="flex items-center gap-1.5 mb-1 text-slate-400">
@@ -1074,7 +1103,7 @@ const Equipamentos = () => {
                       </div>
                       <p className={cn(
                         "text-sm font-semibold text-slate-900 dark:text-white",
-                        label === 'Endereço MAC' && (isMacPendente(selectedEquipment.mac) ? 'text-amber-600 dark:text-amber-400' : 'font-mono')
+                        value === 'Pendente' ? 'text-amber-600 dark:text-amber-400' : (label.startsWith('MAC') || label === 'UUID') && 'font-mono text-xs'
                       )}>{value}</p>
                     </div>
                   ))}
@@ -1305,6 +1334,38 @@ const KPICard = ({ label, value, icon: Icon, description, color }: any) => (
   </div>
 );
 
+type IdentifierFieldProps = {
+  id: string;
+  label: string;
+  value: string;
+  error?: string;
+  placeholder: string;
+  maxLength: number;
+  onChange: (value: string) => void;
+};
+
+const IdentifierField = ({ id, label, value, error, placeholder, maxLength, onChange }: IdentifierFieldProps) => (
+  <div className="space-y-1.5">
+    <Label htmlFor={id} className="text-xs">{label}</Label>
+    <Input
+      id={id}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      autoComplete="off"
+      maxLength={maxLength}
+      aria-invalid={Boolean(error)}
+      className={cn(
+        'bg-slate-50 dark:bg-slate-900/50 font-mono uppercase tracking-wider text-sm',
+        error && 'border-red-400 focus-visible:ring-red-400'
+      )}
+      placeholder={placeholder}
+    />
+    {error
+      ? <p className="text-xs font-semibold text-red-500">{error}</p>
+      : !value && <p className="text-[11px] text-amber-600">Ficará como pendente.</p>}
+  </div>
+);
+
 const FilterChip = ({ active, label, icon: Icon, onClick }: any) => (
   <button
     onClick={onClick}
@@ -1416,6 +1477,7 @@ const EquipmentItem = ({ equipment, parentEquipment, onView, onEdit, onDelete, o
   const status = getStatusConfig(equipment.status);
   const TypeIcon = getTypeIcon(equipment.tipo);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const pendentes = listarIdentificadoresPendentes(equipment);
 
   return (
     <div className="group flex flex-col lg:flex-row lg:items-center justify-between p-8 hover:bg-slate-50/80 transition-all cursor-pointer border-l-4 border-transparent hover:border-primary">
@@ -1443,16 +1505,14 @@ const EquipmentItem = ({ equipment, parentEquipment, onView, onEdit, onDelete, o
               <Building2 className="w-3.5 h-3.5" />
               <span className="text-sm font-medium">{equipment.setor || 'N/A'}</span>
             </div>
-            {isMacPendente(equipment.mac) ? (
-              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-widest">
+            {pendentes.length > 0 && (
+              <span
+                title={`Sem: ${pendentes.join(', ')}`}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-widest"
+              >
                 <AlertTriangle className="w-3 h-3" />
-                MAC pendente
+                {pendentes.length === 3 ? 'Identificação pendente' : `${pendentes.join(' · ')} pendente`}
               </span>
-            ) : (
-              <div className="flex items-center gap-2 text-slate-500">
-                <Network className="w-3.5 h-3.5" />
-                <span className="text-sm font-mono font-medium">{displayMac(equipment.mac)}</span>
-              </div>
             )}
             {parentEquipment && (
               <div className="flex items-center gap-2 text-primary/80">

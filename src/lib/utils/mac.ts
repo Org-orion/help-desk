@@ -21,7 +21,7 @@ export const isValidMac = (value?: string | null): boolean =>
 export const normalizeMac = (value?: string | null): string =>
   isValidMac(value) ? formatMacInput(value) : ''
 
-/** Cadastro antigo sem MAC preenchido — pendente de regularização. */
+/** Sem MAC informado para o adaptador — pendente de levantamento. */
 export const isMacPendente = (value?: string | null): boolean =>
   !isValidMac(value)
 
