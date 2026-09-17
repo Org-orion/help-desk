@@ -5,6 +5,11 @@ begin;
 alter table public.app_users
   add column if not exists pode_excluir_ativos boolean not null default false;
 
+-- app_users tem grant POR COLUNA: `authenticated` só lê o que está listado em
+-- 202607200001_secure_auth_migration.sql. Sem esta linha a leitura do perfil
+-- devolve 403 e o app desloga o usuário.
+grant select (pode_excluir_ativos) on public.app_users to authenticated;
+
 -- RLS está desligado em equipamentos: sem este revoke, a chave anônima que vai
 -- no bundle do frontend apaga qualquer ativo direto pela API, por mais que a
 -- tela esconda o botão. O delete passa a existir só através da função abaixo.
