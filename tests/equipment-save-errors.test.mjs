@@ -13,12 +13,14 @@ test('explica patrimônio duplicado em vez do erro cru do Postgres', () => {
   assert.doesNotMatch(error.message, /duplicate key|constraint/i)
 })
 
-test('explica MAC duplicado', () => {
-  const error = equipamentoError({
+test('distingue qual identificador duplicou', () => {
+  const duplicado = (indice) => equipamentoError({
     code: '23505',
-    message: 'duplicate key value violates unique constraint "idx_equipamentos_mac"',
-  })
-  assert.match(error.message, /MAC já está cadastrado em outro ativo/)
+    message: `duplicate key value violates unique constraint "${indice}"`,
+  }).message
+  assert.match(duplicado('idx_equipamentos_mac_wifi'), /MAC de Wi-Fi já está cadastrado/)
+  assert.match(duplicado('idx_equipamentos_mac_ethernet'), /MAC de Ethernet já está cadastrado/)
+  assert.match(duplicado('idx_equipamentos_uuid_dispositivo'), /UUID já está cadastrado/)
 })
 
 test('explica que ativo com etiqueta QR não pode ser excluído, sem mandar tentar de novo', () => {

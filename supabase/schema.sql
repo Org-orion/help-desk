@@ -33,7 +33,9 @@ create table if not exists public.equipamentos (
   setor text,
   marca text,
   modelo text,
-  mac text,
+  mac_wifi text,
+  mac_ethernet text,
+  uuid_dispositivo text,
   ram text,
   armazenamento text,
   processador text,
@@ -153,7 +155,9 @@ alter table public.chamados set (rowsecurity = off);
 
 create index if not exists idx_app_users_tier on public.app_users(tier);
 create index if not exists idx_equipamentos_status on public.equipamentos(status);
-create unique index if not exists idx_equipamentos_mac on public.equipamentos(mac) where mac is not null;
+create unique index if not exists idx_equipamentos_mac_wifi on public.equipamentos(mac_wifi) where mac_wifi is not null;
+create unique index if not exists idx_equipamentos_mac_ethernet on public.equipamentos(mac_ethernet) where mac_ethernet is not null;
+create unique index if not exists idx_equipamentos_uuid_dispositivo on public.equipamentos(uuid_dispositivo) where uuid_dispositivo is not null;
 create index if not exists idx_produtos_categoria on public.produtos(categoria);
 create index if not exists idx_produto_saidas_produto_data on public.produto_saidas(produto_id, data);
 create index if not exists idx_chamados_status on public.chamados(status);

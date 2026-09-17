@@ -9,13 +9,15 @@ import {
   Package, Activity, CheckCircle2, Settings2, XCircle,
   Cpu, List,
   FilterX, Hash, User as UserIcon, Building2, HardDrive,
-  ChevronRight, LayoutDashboard, SlidersHorizontal, Network, AlertTriangle
+  ChevronRight, LayoutDashboard, SlidersHorizontal, AlertTriangle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
 import { MetricCard, PageHeader, EmptyState, SearchInput } from '@/components/shared'
 import { getEquipmentStatusConfig, getEquipmentTypeIcon } from '@/lib/config/equipment'
-import { displayMac, isMacPendente, stripMac } from '@/lib/utils/mac'
+import { stripMac } from '@/lib/utils/mac'
+import { stripUuid } from '@/lib/utils/uuid'
+import { listarIdentificadoresPendentes } from '@/lib/equipment-identifiers'
 
 // ── Main Component ──────────────────────────────────────────────────────────
 
@@ -50,12 +52,13 @@ const AnaliseEquipamentos = () => {
     if (search) {
       const term = search.toLowerCase()
       const macTerm = stripMac(search)
+      const uuidTerm = stripUuid(search)
       rows = rows.filter(e => 
         e.nome.toLowerCase().includes(term) || 
         e.patrimonio.toLowerCase().includes(term) || 
         (e.usuario ?? '').toLowerCase().includes(term) ||
-        (e.mac ?? '').toLowerCase().includes(term) ||
-        (macTerm.length >= 2 && stripMac(e.mac).includes(macTerm))
+        (macTerm.length >= 2 && (stripMac(e.mac_wifi).includes(macTerm) || stripMac(e.mac_ethernet).includes(macTerm))) ||
+        (uuidTerm.length >= 2 && stripUuid(e.uuid_dispositivo).includes(uuidTerm))
       )
     }
 
@@ -235,6 +238,7 @@ const FilterChip = ({ active, label, icon: Icon, onClick }: any) => (
 const AnaliseItem = ({ equipment }: { equipment: Equipamento }) => {
   const status = getEquipmentStatusConfig(equipment.status);
   const TypeIcon = getEquipmentTypeIcon(equipment.tipo);
+  const pendentes = listarIdentificadoresPendentes(equipment);
 
   return (
     <div className="group flex flex-col lg:flex-row lg:items-center justify-between p-8 hover:bg-slate-50/80 transition-all border-l-4 border-transparent hover:border-primary">
@@ -262,16 +266,14 @@ const AnaliseItem = ({ equipment }: { equipment: Equipamento }) => {
               <Building2 className="w-3.5 h-3.5" />
               <span className="text-sm font-medium">{equipment.setor || 'N/A'}</span>
             </div>
-            {isMacPendente(equipment.mac) ? (
-              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-widest">
+            {pendentes.length > 0 && (
+              <span
+                title={`Sem: ${pendentes.join(', ')}`}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-widest"
+              >
                 <AlertTriangle className="w-3 h-3" />
-                MAC pendente
+                {pendentes.length === 3 ? 'Identificação pendente' : `${pendentes.join(' · ')} pendente`}
               </span>
-            ) : (
-              <div className="flex items-center gap-2 text-slate-500">
-                <Network className="w-3.5 h-3.5" />
-                <span className="text-sm font-mono font-medium">{displayMac(equipment.mac)}</span>
-              </div>
             )}
           </div>
         </div>

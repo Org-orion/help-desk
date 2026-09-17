@@ -30,9 +30,9 @@ async function main() {
     if (setErr) throw new Error(`Falha ao inserir setores: ${setErr.message}`)
 
     const equipamentos = [
-      { nome: 'Desktop de Teste', tipo: 'Desktop', patrimonio: 'PC001', status: 'Disponível', usuario: 'JOÃO TESTE', setor: 'TI', mac: '00:1A:2B:3C:4D:01' },
-      { nome: 'Notebook de Teste', tipo: 'Notebook', patrimonio: 'PC002', status: 'Em Uso', usuario: 'MARIA DEMO', setor: 'ADMINISTRATIVO', mac: '00:1A:2B:3C:4D:02', ram: '16GB', armazenamento: '512GB SSD', processador: 'Intel i7' },
-      { nome: 'Tablet de Teste', tipo: 'Tablet', patrimonio: 'TAB-001', status: 'Manutenção', usuario: '-', setor: 'TI', mac: '00:1A:2B:3C:4D:03' },
+      { nome: 'Desktop de Teste', tipo: 'Desktop', patrimonio: 'PC001', status: 'Disponível', usuario: 'JOÃO TESTE', setor: 'TI', mac_ethernet: '00:1A:2B:3C:4D:01', uuid_dispositivo: '4C4C4544-0031-3010-8031-B7C04F485831' },
+      { nome: 'Notebook de Teste', tipo: 'Notebook', patrimonio: 'PC002', status: 'Em Uso', usuario: 'MARIA DEMO', setor: 'ADMINISTRATIVO', mac_wifi: '00:1A:2B:3C:4D:02', ram: '16GB', armazenamento: '512GB SSD', processador: 'Intel i7' },
+      { nome: 'Tablet de Teste', tipo: 'Tablet', patrimonio: 'TAB-001', status: 'Manutenção', usuario: '-', setor: 'TI' },
     ]
     const { error: eqErr } = await supabase.from('equipamentos').insert(equipamentos)
     if (eqErr) throw new Error(`Falha ao inserir equipamentos: ${eqErr.message}`)

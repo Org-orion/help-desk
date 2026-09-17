@@ -24,8 +24,14 @@ export function equipamentoError(
   if (haystack.includes('equipamentos_patrimonio_key')) {
     return new Error('Já existe um ativo com esse patrimônio. Verifique o código informado.')
   }
-  if (haystack.includes('idx_equipamentos_mac')) {
-    return new Error('Esse endereço MAC já está cadastrado em outro ativo.')
+  if (haystack.includes('idx_equipamentos_mac_wifi')) {
+    return new Error('Esse MAC de Wi-Fi já está cadastrado em outro ativo.')
+  }
+  if (haystack.includes('idx_equipamentos_mac_ethernet')) {
+    return new Error('Esse MAC de Ethernet já está cadastrado em outro ativo.')
+  }
+  if (haystack.includes('idx_equipamentos_uuid_dispositivo')) {
+    return new Error('Esse UUID já está cadastrado em outro ativo.')
   }
   if (haystack.includes('equipment_qr_label')) {
     return new Error('Este ativo possui histórico de etiqueta QR e, por isso, não pode ser excluído. Marque-o como Inativo.')

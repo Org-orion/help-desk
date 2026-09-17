@@ -6,7 +6,9 @@ export type ResponsibilityTermEquipment = {
   patrimonio?: string
   marca?: string
   modelo?: string
-  mac?: string | null
+  mac_wifi?: string | null
+  mac_ethernet?: string | null
+  uuid_dispositivo?: string | null
   ram?: string
   armazenamento?: string
   processador?: string
@@ -66,7 +68,9 @@ export const buildEquipmentDeliveryDescription = (equipment: ResponsibilityTermE
     appendLabel('tela de', equipment.polegadas),
     appendLabel('frequência de', appendSuffix(equipment.ghz, 'GHz')),
     appendLabel('patrimônio', equipment.patrimonio),
-    appendLabel('MAC', equipment.mac ?? undefined),
+    appendLabel('MAC Wi-Fi', equipment.mac_wifi ?? undefined),
+    appendLabel('MAC Ethernet', equipment.mac_ethernet ?? undefined),
+    appendLabel('UUID', equipment.uuid_dispositivo ?? undefined),
   ].filter(Boolean)
 
   if (!details.length && clean(equipment.nome)) {
