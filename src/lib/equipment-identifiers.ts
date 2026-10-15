@@ -27,3 +27,16 @@ export const listarIdentificadoresPendentes = (equipment: EquipmentIdentifiers):
 
 export const temIdentificadorPendente = (equipment: EquipmentIdentifiers): boolean =>
   listarIdentificadoresPendentes(equipment).length > 0
+
+/** Tipo de ativo que, por não costumar ter plaqueta, dispensa o patrimônio. */
+export const TIPO_SEM_PATRIMONIO_OBRIGATORIO = 'Periféricos'
+
+/** Fonte única da regra de obrigatoriedade do patrimônio. */
+export const exigePatrimonio = (tipo?: string | null): boolean =>
+  tipo !== TIPO_SEM_PATRIMONIO_OBRIGATORIO
+
+export const PATRIMONIO_AUSENTE = 'Sem patrimônio'
+
+/** Rótulo para listas, fichas e documentos, já que o campo pode vir vazio. */
+export const displayPatrimonio = (value?: string | null): string =>
+  (value ?? '').trim() || PATRIMONIO_AUSENTE

@@ -49,7 +49,7 @@ import { getEquipmentTypeIcon } from '@/lib/config/equipment';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatMacInput, isValidMac, isMacPendente, normalizeMac, displayMac, stripMac } from '@/lib/utils/mac';
 import { formatUuidInput, isValidUuid, isUuidPendente, normalizeUuid, displayUuid, stripUuid } from '@/lib/utils/uuid';
-import { listarIdentificadoresPendentes, temIdentificadorPendente } from '@/lib/equipment-identifiers';
+import { listarIdentificadoresPendentes, temIdentificadorPendente, exigePatrimonio, displayPatrimonio } from '@/lib/equipment-identifiers';
 import {
   getEquipamentoPrincipal,
   listEquipamentosPrincipaisDisponiveis,
@@ -289,7 +289,7 @@ const Equipamentos = () => {
     const uuidTerm = stripUuid(searchTerm);
     let rows = equipamentos.filter(eq =>
       eq.nome.toLowerCase().includes(term) ||
-      eq.patrimonio.toLowerCase().includes(term) ||
+      (eq.patrimonio || '').toLowerCase().includes(term) ||
       (eq.usuario || '').toLowerCase().includes(term) ||
       (macTerm.length >= 2 && (stripMac(eq.mac_wifi).includes(macTerm) || stripMac(eq.mac_ethernet).includes(macTerm))) ||
       (uuidTerm.length >= 2 && stripUuid(eq.uuid_dispositivo).includes(uuidTerm))
@@ -438,11 +438,16 @@ const Equipamentos = () => {
       toast.error('Confira os identificadores de rede informados.');
       return;
     }
+    if (exigePatrimonio(formData.tipo) && !formData.patrimonio.trim()) {
+      toast.error('Informe o patrimônio. Ele só é opcional para Periféricos.');
+      return;
+    }
     setIdentifierErrors({});
-    // Vazio precisa virar NULL, e não '': os índices únicos ignoram NULL, mas
-    // duas strings vazias colidiriam entre si.
+    // Vazio precisa virar NULL, e não '': as restrições de unicidade ignoram
+    // NULL, mas duas strings vazias colidiriam entre si.
     const payload = {
       ...formData,
+      patrimonio: formData.patrimonio.trim() || null,
       mac_wifi: normalizeMac(formData.mac_wifi) || null,
       mac_ethernet: normalizeMac(formData.mac_ethernet) || null,
       uuid_dispositivo: normalizeUuid(formData.uuid_dispositivo) || null,
@@ -859,8 +864,11 @@ const Equipamentos = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="patrimonio">Patrimônio / Código</Label>
-                    <Input id="patrimonio" value={formData.patrimonio} onChange={(e) => setFormData({ ...formData, patrimonio: e.target.value })} required className="bg-slate-50 dark:bg-slate-900/50" placeholder="Ex: PC-001" />
+                    <Label htmlFor="patrimonio">
+                      Patrimônio / Código
+                      {!exigePatrimonio(formData.tipo) && <span className="ml-1 font-normal text-slate-400">(opcional)</span>}
+                    </Label>
+                    <Input id="patrimonio" value={formData.patrimonio} onChange={(e) => setFormData({ ...formData, patrimonio: e.target.value })} required={exigePatrimonio(formData.tipo)} className="bg-slate-50 dark:bg-slate-900/50" placeholder="Ex: PC-001" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="status">Status Operacional</Label>
@@ -1067,7 +1075,7 @@ const Equipamentos = () => {
             <div className="flex items-start justify-between pr-6">
               <div>
                 <SheetTitle className="text-xl font-bold text-slate-950 dark:text-white leading-tight">{selectedEquipment?.nome}</SheetTitle>
-                <p className="text-xs text-slate-400 font-mono mt-1">{selectedEquipment?.patrimonio}</p>
+                <p className="text-xs text-slate-400 font-mono mt-1">{displayPatrimonio(selectedEquipment?.patrimonio)}</p>
               </div>
               {selectedEquipment && (
                 <Badge variant="outline" className={cn("px-3 py-1", getStatusConfig(selectedEquipment.status).color)}>
@@ -1121,7 +1129,7 @@ const Equipamentos = () => {
                       className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
                     >
                       <div className="min-w-0">
-                        <p className="font-mono text-sm font-bold text-primary">{selectedParentEquipment.patrimonio}</p>
+                        <p className="font-mono text-sm font-bold text-primary">{displayPatrimonio(selectedParentEquipment.patrimonio)}</p>
                         <p className="mt-1 truncate text-sm font-semibold text-slate-900">{selectedParentEquipment.nome}</p>
                         <p className="mt-1 text-xs text-slate-500">{formatEquipmentLinkDetails(selectedParentEquipment)}</p>
                       </div>
@@ -1146,7 +1154,7 @@ const Equipamentos = () => {
                         >
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-mono text-sm font-bold text-primary">{linked.patrimonio}</span>
+                              <span className="font-mono text-sm font-bold text-primary">{displayPatrimonio(linked.patrimonio)}</span>
                               <Badge variant="outline" className={cn("px-2 py-0.5 text-[10px]", getStatusConfig(linked.status).color)}>{linked.status}</Badge>
                             </div>
                             <p className="mt-1 truncate text-sm font-semibold text-slate-900">{linked.nome}</p>
@@ -1199,7 +1207,7 @@ const Equipamentos = () => {
                     <FileText className="w-12 h-12 text-primary/40" />
                   </div>
                   <div className="space-y-4 text-sm text-slate-600 dark:text-slate-400">
-                    <p>O presente termo formaliza a entrega do equipamento <strong>{selectedEquipment.nome}</strong> ({selectedEquipment.patrimonio}) para o colaborador <strong>{selectedEquipment.usuario || 'Não informado'}</strong>.</p>
+                    <p>O presente termo formaliza a entrega do equipamento <strong>{selectedEquipment.nome}</strong> ({displayPatrimonio(selectedEquipment.patrimonio)}) para o colaborador <strong>{selectedEquipment.usuario || 'Não informado'}</strong>.</p>
                     <p>Ao gerar este documento, você confirma que o ativo está em perfeitas condições de uso.</p>
                   </div>
                 </div>
@@ -1285,7 +1293,7 @@ const Equipamentos = () => {
             <div className="space-y-5">
               <div className="rounded-xl border bg-slate-50 p-4 text-sm">
                 <p className="font-bold text-slate-900">{createdEquipment.nome}</p>
-                <p className="mt-1 font-mono text-slate-500">{createdEquipment.patrimonio}</p>
+                <p className="mt-1 font-mono text-slate-500">{displayPatrimonio(createdEquipment.patrimonio)}</p>
               </div>
               {qrDataUrl && <img src={qrDataUrl} alt={`QR Code do equipamento ${createdEquipment.nome}`} className="mx-auto h-52 w-52 rounded-xl border bg-white p-2" />}
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -1309,7 +1317,7 @@ const Equipamentos = () => {
           <div className="equipment-print-info">
             <img src={LOGO_MINI_SRC} alt="CONCREM" />
             <strong>PATRIMÔNIO</strong>
-            <span>{createdEquipment.patrimonio}</span>
+            <span>{displayPatrimonio(createdEquipment.patrimonio)}</span>
           </div>
         </div>
       )}
@@ -1421,7 +1429,7 @@ const EquipmentLinkField = ({
       {selected ? (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
           <div className="min-w-0">
-            <p className="truncate font-mono text-sm font-bold text-primary">{selected.patrimonio} — {selected.nome}</p>
+            <p className="truncate font-mono text-sm font-bold text-primary">{displayPatrimonio(selected.patrimonio)} — {selected.nome}</p>
             <p className="mt-1 truncate text-xs text-slate-500">{formatEquipmentLinkDetails(selected)}</p>
           </div>
           <Button type="button" variant="ghost" size="icon" disabled={disabled} aria-label="Remover vínculo" onClick={() => onChange(null)} className="h-8 w-8 shrink-0 text-slate-500 hover:text-red-600">
@@ -1462,7 +1470,7 @@ const EquipmentLinkField = ({
                 )}
               >
                 <p className="truncate text-sm font-semibold text-slate-900">
-                  <span className="font-mono text-primary">{equipment.patrimonio}</span> — {equipment.nome}
+                  <span className="font-mono text-primary">{displayPatrimonio(equipment.patrimonio)}</span> — {equipment.nome}
                 </p>
                 <p className="mt-0.5 truncate text-xs text-slate-500">{equipment.tipo}</p>
               </button>
@@ -1498,7 +1506,7 @@ const EquipmentItem = ({ equipment, parentEquipment, onView, onEdit, onDelete, o
           <div className="flex flex-wrap items-center gap-y-2 gap-x-6">
             <div className="flex items-center gap-2 text-slate-500">
               <Hash className="w-3.5 h-3.5" />
-              <span className="text-sm font-mono font-bold">{equipment.patrimonio}</span>
+              <span className="text-sm font-mono font-bold">{displayPatrimonio(equipment.patrimonio)}</span>
             </div>
             <div className="flex items-center gap-2 text-slate-500">
               <UserIcon className="w-3.5 h-3.5" />
@@ -1520,7 +1528,7 @@ const EquipmentItem = ({ equipment, parentEquipment, onView, onEdit, onDelete, o
             {parentEquipment && (
               <div className="flex items-center gap-2 text-primary/80">
                 <Link2 className="h-3.5 w-3.5" />
-                <span className="text-xs font-semibold">Vinculado ao {parentEquipment.patrimonio}</span>
+                <span className="text-xs font-semibold">Vinculado ao {displayPatrimonio(parentEquipment.patrimonio)}</span>
               </div>
             )}
           </div>
@@ -1559,7 +1567,14 @@ const EquipmentItem = ({ equipment, parentEquipment, onView, onEdit, onDelete, o
                 <FileText className="w-4 h-4 mr-3 text-slate-400" />
                 <span className="font-bold text-slate-700">Gerar Termo PDF</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onQrCode} className="rounded-xl py-3 cursor-pointer">
+              {/* A etiqueta deriva o código do patrimônio; sem ele a emissão
+                  falharia no servidor. Melhor explicar do que deixar tentar. */}
+              <DropdownMenuItem
+                onClick={onQrCode}
+                disabled={!equipment.patrimonio}
+                title={equipment.patrimonio ? undefined : 'Informe o patrimônio para emitir a etiqueta QR.'}
+                className="rounded-xl py-3 cursor-pointer"
+              >
                 <QrCode className="w-4 h-4 mr-3 text-slate-400" />
                 <span className="font-bold text-slate-700">Gerar QR Code</span>
               </DropdownMenuItem>

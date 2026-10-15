@@ -17,7 +17,7 @@ import { MetricCard, PageHeader, EmptyState, SearchInput } from '@/components/sh
 import { getEquipmentStatusConfig, getEquipmentTypeIcon } from '@/lib/config/equipment'
 import { stripMac } from '@/lib/utils/mac'
 import { stripUuid } from '@/lib/utils/uuid'
-import { listarIdentificadoresPendentes } from '@/lib/equipment-identifiers'
+import { listarIdentificadoresPendentes, displayPatrimonio } from '@/lib/equipment-identifiers'
 
 // ── Main Component ──────────────────────────────────────────────────────────
 
@@ -55,7 +55,7 @@ const AnaliseEquipamentos = () => {
       const uuidTerm = stripUuid(search)
       rows = rows.filter(e => 
         e.nome.toLowerCase().includes(term) || 
-        e.patrimonio.toLowerCase().includes(term) || 
+        (e.patrimonio || '').toLowerCase().includes(term) || 
         (e.usuario ?? '').toLowerCase().includes(term) ||
         (macTerm.length >= 2 && (stripMac(e.mac_wifi).includes(macTerm) || stripMac(e.mac_ethernet).includes(macTerm))) ||
         (uuidTerm.length >= 2 && stripUuid(e.uuid_dispositivo).includes(uuidTerm))
@@ -256,7 +256,7 @@ const AnaliseItem = ({ equipment }: { equipment: Equipamento }) => {
           <div className="flex flex-wrap items-center gap-y-2 gap-x-6">
             <div className="flex items-center gap-2 text-slate-500">
               <Hash className="w-3.5 h-3.5" />
-              <span className="text-sm font-mono font-bold">{equipment.patrimonio}</span>
+              <span className="text-sm font-mono font-bold">{displayPatrimonio(equipment.patrimonio)}</span>
             </div>
             <div className="flex items-center gap-2 text-slate-500">
               <UserIcon className="w-3.5 h-3.5" />

@@ -27,7 +27,7 @@ create table if not exists public.equipamentos (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
   tipo text not null,
-  patrimonio text unique not null,
+  patrimonio text unique,
   status text not null check (status in ('Disponível','Em Uso','Manutenção','Inativo')),
   usuario text,
   setor text,
