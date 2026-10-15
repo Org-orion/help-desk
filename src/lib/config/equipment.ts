@@ -1,6 +1,6 @@
 import { CheckCircle2, Activity, Settings2, XCircle } from 'lucide-react'
 import {
-  Laptop, Cpu, Monitor, Tablet, Smartphone, Printer, Package,
+  Laptop, Cpu, Monitor, Tablet, Smartphone, Printer, Keyboard, Package,
 } from 'lucide-react'
 
 export const equipmentStatusConfig = {
@@ -38,6 +38,7 @@ const equipmentTypeIconMap: Record<string, React.ComponentType<{ className?: str
   'Tablet': Tablet,
   'Smartphone': Smartphone,
   'Impressora': Printer,
+  'Periféricos': Keyboard,
 }
 
 export const getEquipmentTypeIcon = (tipo: string) =>

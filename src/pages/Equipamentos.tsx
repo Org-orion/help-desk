@@ -19,7 +19,7 @@ import {
   User as UserIcon, Building2, Activity, CheckCircle2, XCircle, Eye,
   LayoutGrid, List, SlidersHorizontal, ChevronRight, Hash, HardDrive, 
   Settings2, ArrowRight, Upload, Image as ImageIcon, X, Star, QrCode, Download, Link2,
-  Network, AlertTriangle
+  Network, AlertTriangle, Keyboard
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -45,6 +45,7 @@ import { EquipmentQrManageDialog } from '@/components/equipment-qr/EquipmentQrMa
 import { EQUIPMENT_QR_LABELS_UNAVAILABLE_MESSAGE, type EquipmentQrLookupDTO } from '@/lib/equipment-qr-labels';
 import { ConfirmDeleteModal } from '@/components/shared/ConfirmDeleteModal';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { getEquipmentTypeIcon } from '@/lib/config/equipment';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatMacInput, isValidMac, isMacPendente, normalizeMac, displayMac, stripMac } from '@/lib/utils/mac';
 import { formatUuidInput, isValidUuid, isUuidPendente, normalizeUuid, displayUuid, stripUuid } from '@/lib/utils/uuid';
@@ -132,13 +133,7 @@ const getStatusConfig = (status: string) => {
   return configs[status] || configs['Disponível'];
 };
 
-const getTypeIcon = (tipo: string): any => {
-  const map: Record<string, any> = {
-    'Notebook': Laptop, 'Desktop': Cpu, 'Monitor': Monitor,
-    'Tablet': Tablet, 'Smartphone': Smartphone, 'Impressora': Printer,
-  };
-  return map[tipo] ?? Package;
-};
+const getTypeIcon = getEquipmentTypeIcon;
 
 // ── Main Component ──────────────────────────────────────────────────────────
 
@@ -186,7 +181,7 @@ const Equipamentos = () => {
 
   // State
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeType, setActiveType] = useState<'all' | 'PC' | 'TAB' | 'CEL' | 'IMP' | 'MON'>('all');
+  const [activeType, setActiveType] = useState<'all' | 'PC' | 'TAB' | 'CEL' | 'IMP' | 'MON' | 'PER'>('all');
   const [activeStatus, setActiveStatus] = useState<string>('all');
   const [activeSetor, setActiveSetor] = useState<string>('all');
   const [onlyPendente, setOnlyPendente] = useState(false);
@@ -271,6 +266,7 @@ const Equipamentos = () => {
   // Logic Helpers
   const getPrefix = useCallback((tipo: string) => {
     if (['Desktop', 'Notebook'].includes(tipo)) return 'PC';
+    if (tipo === 'Periféricos') return 'PER';
     if (tipo === 'Tablet') return 'TAB';
     if (tipo === 'Smartphone') return 'CEL';
     if (tipo === 'Impressora') return 'IMP';
@@ -282,7 +278,7 @@ const Equipamentos = () => {
   const getPrefixByEquipment = useCallback((e: Equipment) => (isJVName(e.nome) ? 'JV' : getPrefix(e.tipo)), [isJVName, getPrefix]);
 
   const parseCode = useCallback((pat: string) => {
-    const m = (pat || '').match(/^(JV|PC|TAB|CEL|IMP|MON)-?(\d{3})$/i);
+    const m = (pat || '').match(/^(JV|PC|TAB|CEL|IMP|MON|PER)-?(\d{3})$/i);
     if (!m) return null;
     return { prefix: m[1].toUpperCase(), num: Number(m[2]) };
   }, []);
@@ -673,6 +669,12 @@ const Equipamentos = () => {
               icon={Monitor}
               onClick={() => setActiveType('MON')} 
             />
+            <FilterChip 
+              active={activeType === 'PER'} 
+              label="Periféricos" 
+              icon={Keyboard}
+              onClick={() => setActiveType('PER')} 
+            />
           </div>
         </div>
 
@@ -850,6 +852,7 @@ const Equipamentos = () => {
                         <SelectItem value="Impressora">Impressora</SelectItem>
                         <SelectItem value="Smartphone">Smartphone</SelectItem>
                         <SelectItem value="Tablet">Tablet</SelectItem>
+                        <SelectItem value="Periféricos">Periféricos</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
