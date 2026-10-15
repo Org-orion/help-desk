@@ -7,10 +7,36 @@ export type LoginResult='ok'|'invalid'|'upgrade_required'|'rate_limited'|'unavai
 interface AuthContextType { user:User|null; login:(username:string,password:string,newPassword?:string)=>Promise<LoginResult>; logout:()=>Promise<void>; register:(email:string,password:string,name:string)=>Promise<boolean>; isAuthenticated:boolean; loading:boolean }
 const AuthContext=createContext<AuthContextType|undefined>(undefined)
 
+// Colunas sem as quais não há sessão possível.
+const PROFILE_CORE_COLUMNS='id,username,name,tier'
+// Colunas de funcionalidade. app_users tem grant POR COLUNA e as migrações
+// podem estar atrás do deploy, então a ausência de uma delas não pode derrubar
+// o login: o perfil carrega sem ela e a funcionalidade fica desligada.
+const PROFILE_OPTIONAL_COLUMNS='pode_excluir_ativos'
+// 42703 = coluna inexistente (migração não rodou).
+// 42501 = privilégio insuficiente (coluna existe, mas faltou o grant).
+const MISSING_OPTIONAL_COLUMN_CODES=new Set(['42703','42501'])
+
+type ProfileRow={id:string;username:string;name:string;tier:string;pode_excluir_ativos?:boolean|null}
+
+const toUser=(row:ProfileRow):User=>({
+  id:row.id,
+  email:row.username,
+  name:row.name,
+  role:row.tier==='admin'?'admin':'user',
+  tier:row.tier==='vip'||row.tier==='admin'?'vip':'padrao',
+  podeExcluirAtivos:row.pode_excluir_ativos===true,
+})
+
 async function loadProfile(authUserId:string):Promise<User|null>{
   if(!supabase)return null
-  const {data,error}=await supabase.from('app_users').select('id,username,name,tier,pode_excluir_ativos').eq('auth_user_id',authUserId).single();if(error||!data)return null
-  return {id:data.id,email:data.username,name:data.name,role:data.tier==='admin'?'admin':'user',tier:data.tier==='vip'||data.tier==='admin'?'vip':'padrao',podeExcluirAtivos:data.pode_excluir_ativos===true}
+  const {data,error}=await supabase.from('app_users').select(`${PROFILE_CORE_COLUMNS},${PROFILE_OPTIONAL_COLUMNS}`).eq('auth_user_id',authUserId).single()
+  if(!error&&data)return toUser(data as ProfileRow)
+  if(!error||!MISSING_OPTIONAL_COLUMN_CODES.has(error.code))return null
+  console.warn('Coluna opcional indisponível em app_users; carregando o perfil sem ela.',error.code,error.message)
+  const fallback=await supabase.from('app_users').select(PROFILE_CORE_COLUMNS).eq('auth_user_id',authUserId).single()
+  if(fallback.error||!fallback.data)return null
+  return toUser(fallback.data as ProfileRow)
 }
 
 export function AuthProvider({children}:{children:ReactNode}){
