@@ -2,7 +2,7 @@ export type EquipamentoVinculoResumo = {
   id: string
   nome: string
   tipo: string
-  patrimonio: string
+  patrimonio?: string | null
   status: string
   marca?: string | null
   modelo?: string | null

@@ -8,7 +8,8 @@ export type Equipamento = {
   id: string
   nome: string
   tipo: string
-  patrimonio: string
+  /** Opcional para Periféricos; os demais tipos continuam exigindo. */
+  patrimonio?: string | null
   marca?: string
   modelo?: string
   /** MAC do adaptador de rede sem fio Wi-Fi. Opcional; ausente = pendente. */

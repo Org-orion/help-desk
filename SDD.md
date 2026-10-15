@@ -909,7 +909,9 @@ Mutações críticas são delegadas a RPCs `security definer` transacionais.
 
 ### `Equipamento`
 
-`id`, `nome`, `tipo`, `patrimonio`, `marca?`, `modelo?`, `mac_wifi?`, `mac_ethernet?`, `uuid_dispositivo?`, `status`, `usuario?`, `setor?`, `ram?`, `armazenamento?`, `processador?`, `polegadas?`, `ghz?`, `equipamento_pai_id?`, `created_at?`.
+`id`, `nome`, `tipo`, `patrimonio?`, `marca?`, `modelo?`, `mac_wifi?`, `mac_ethernet?`, `uuid_dispositivo?`, `status`, `usuario?`, `setor?`, `ram?`, `armazenamento?`, `processador?`, `polegadas?`, `ghz?`, `equipamento_pai_id?`, `created_at?`.
+
+O `patrimonio` é único e obrigatório para todos os tipos **exceto `Periféricos`**, que costumam chegar sem plaqueta. A coluna aceita nulo, e o formulário grava `NULL` — nunca string vazia — porque a restrição UNIQUE não considera dois nulos iguais, mas consideraria duas strings vazias. A regra vive em `exigePatrimonio`, em `lib/equipment-identifiers`. Um ativo sem patrimônio não pode receber etiqueta QR, já que o código da etiqueta deriva dele; a ação fica desabilitada na listagem.
 
 Os três identificadores de rede são **opcionais**: `mac_wifi` (adaptador de rede sem fio Wi-Fi), `mac_ethernet` (adaptador Ethernet) e `uuid_dispositivo`. Nenhum bloqueia o cadastro — o que ficar em branco aparece como **Pendente** na ficha e faz o ativo entrar no filtro "Identificação pendente", que mostra a contagem do que falta levantar. Um valor pela metade, porém, é recusado: ou está completo, ou está vazio.
 

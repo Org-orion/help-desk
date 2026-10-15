@@ -18,7 +18,7 @@ export function EquipmentQrBindExistingDialog({ label, equipment, onOpenChange }
   const options = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('pt-BR')
     if (!term) return equipment.slice(0, 20)
-    return equipment.filter((item) => item.nome.toLocaleLowerCase('pt-BR').includes(term) || item.patrimonio.toLocaleLowerCase('pt-BR').includes(term)).slice(0, 20)
+    return equipment.filter((item) => item.nome.toLocaleLowerCase('pt-BR').includes(term) || (item.patrimonio || '').toLocaleLowerCase('pt-BR').includes(term)).slice(0, 20)
   }, [equipment, search])
   const selected = equipment.find((item) => item.id === selectedId)
 
